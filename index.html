@@ -13675,6 +13675,8 @@ flowchart TD
         });
       // Speed slider
       function setDelay(ms) {
+        // 🚨 CRITICAL: Update label locally FIRST (API may not be running)
+        document.getElementById("delay-val").textContent = ms + "ms";
         fetch("/api/delay?ms=" + ms, { method: "POST" })
           .then(function (r) {
             return r.json();

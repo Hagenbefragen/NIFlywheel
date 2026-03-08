@@ -2000,86 +2000,94 @@
       });
 
       function updatePanels() {
-        var ip = document.getElementById("info-panel"),
-          pp = document.getElementById("prompt-panel");
-        if (selectedLayer) {
-          var L = ALL_LAYERS.find(function (l) {
-            return l.id === selectedLayer;
+        try {
+          var ip = document.getElementById("info-panel"),
+            pp = document.getElementById("prompt-panel");
+          if (selectedLayer) {
+            var L = ALL_LAYERS.find(function (l) {
+              return l.id === selectedLayer;
+            });
+            if (!L) return;
+            var g = KD_GROUPS[L.group];
+            if (!g) return;
+            ip.querySelector(".domain").textContent = g.name;
+            ip.querySelector(".domain").style.color = g.color;
+            ip.querySelector("h3").textContent = L.emoji + " " + L.name;
+            ip.querySelector("h3").style.color = L.wired
+              ? "#f0f4f8"
+              : "#374151";
+            var badge = ip.querySelector(".badge");
+            badge.textContent = L.wired ? L.phase.toUpperCase() : "💀 UNWIRED";
+            badge.style.background = L.wired
+              ? g.color + "22"
+              : "rgba(55,65,81,0.3)";
+            badge.style.color = L.wired ? g.color : "#6b7280";
+            badge.style.border =
+              "1px solid " + (L.wired ? g.color + "44" : "rgba(55,65,81,0.4)");
+            ip.querySelector("p").textContent = L.desc;
+            var dot = ip.querySelector(".status-dot"),
+              txt = ip.querySelector(".status-row span");
+            var act = layerActivity[L.id];
+            dot.style.background = !L.wired
+              ? "#374151"
+              : act.active
+              ? "#10b981"
+              : "#64748b";
+            txt.textContent = !L.wired
+              ? "UNWIRED — planned for future sprint"
+              : act.active
+              ? "ACTIVE — intensity " + act.intensity.toFixed(2)
+              : "DORMANT — waiting for trigger";
+            txt.style.color = !L.wired
+              ? "#374151"
+              : act.active
+              ? "#10b981"
+              : "#64748b";
+            // Show role from SSOT
+            // 🚨 CRITICAL: Layers don't have .role property — use ROLE_MAP lookup
+            var roleInfo = AGENT_ROLES[ROLE_MAP[L.id]] || AGENT_ROLES.blocker;
+            var roleEl = ip.querySelector(".claim");
+            roleEl.textContent =
+              roleInfo.symbol +
+              " " +
+              roleInfo.name +
+              " \u00b7 \ud83d\udcdc " +
+              L.claim;
+            roleEl.style.color = roleInfo.color;
+            ip.querySelector(".file").textContent = "\ud83d\udcc1 " + L.file;
+            ip.classList.add("visible");
+            pp.classList.remove("visible");
+          } else if (selectedPrompt !== null) {
+            var d = flowingPrompts[selectedPrompt].data;
+            document.getElementById("prompt-stages").innerHTML =
+              '<div class="stage"><div class="stage-title" style="color:#94a3b8">📝 Original</div><div class="stage-text">' +
+              d.original +
+              "</div></div>" +
+              '<div class="stage"><div class="stage-title" style="color:#ef4444">🛡️ Shield</div><div class="stage-text">' +
+              d.stages.shield +
+              '</div><span class="flag ' +
+              (d.status === "block" ? "block" : "pass") +
+              '">' +
+              (d.status === "block" ? "✕ BLOCKED" : "✓ PASS") +
+              "</span></div>" +
+              '<div class="stage"><div class="stage-title" style="color:#2dd4bf">🐚 Compress</div><div class="stage-text">' +
+              d.stages.compress +
+              "</div></div>" +
+              '<div class="stage"><div class="stage-title" style="color:#7c3aed">🐬 Audit</div><div class="stage-text">' +
+              d.stages.audit +
+              "</div></div>";
+            pp.classList.add("visible");
+            ip.classList.remove("visible");
+          } else {
+            ip.classList.remove("visible");
+            pp.classList.remove("visible");
+          }
+          legendEl.querySelectorAll(".item").forEach(function (el) {
+            el.classList.toggle("active", el.dataset.id === selectedLayer);
           });
-          if (!L) return;
-          var g = KD_GROUPS[L.group];
-          ip.querySelector(".domain").textContent = g.name;
-          ip.querySelector(".domain").style.color = g.color;
-          ip.querySelector("h3").textContent = L.emoji + " " + L.name;
-          ip.querySelector("h3").style.color = L.wired ? "#f0f4f8" : "#374151";
-          var badge = ip.querySelector(".badge");
-          badge.textContent = L.wired ? L.phase.toUpperCase() : "💀 UNWIRED";
-          badge.style.background = L.wired
-            ? g.color + "22"
-            : "rgba(55,65,81,0.3)";
-          badge.style.color = L.wired ? g.color : "#6b7280";
-          badge.style.border =
-            "1px solid " + (L.wired ? g.color + "44" : "rgba(55,65,81,0.4)");
-          ip.querySelector("p").textContent = L.desc;
-          var dot = ip.querySelector(".status-dot"),
-            txt = ip.querySelector(".status-row span");
-          var act = layerActivity[L.id];
-          dot.style.background = !L.wired
-            ? "#374151"
-            : act.active
-            ? "#10b981"
-            : "#64748b";
-          txt.textContent = !L.wired
-            ? "UNWIRED — planned for future sprint"
-            : act.active
-            ? "ACTIVE — intensity " + act.intensity.toFixed(2)
-            : "DORMANT — waiting for trigger";
-          txt.style.color = !L.wired
-            ? "#374151"
-            : act.active
-            ? "#10b981"
-            : "#64748b";
-          // Show role from SSOT
-          var roleInfo = AGENT_ROLES[L.role] || AGENT_ROLES.blocker;
-          var roleEl = ip.querySelector(".claim");
-          roleEl.textContent =
-            roleInfo.symbol +
-            " " +
-            roleInfo.name +
-            " \u00b7 \ud83d\udcdc " +
-            L.claim;
-          roleEl.style.color = roleInfo.color;
-          ip.querySelector(".file").textContent = "\ud83d\udcc1 " + L.file;
-          ip.classList.add("visible");
-          pp.classList.remove("visible");
-        } else if (selectedPrompt !== null) {
-          var d = flowingPrompts[selectedPrompt].data;
-          document.getElementById("prompt-stages").innerHTML =
-            '<div class="stage"><div class="stage-title" style="color:#94a3b8">📝 Original</div><div class="stage-text">' +
-            d.original +
-            "</div></div>" +
-            '<div class="stage"><div class="stage-title" style="color:#ef4444">🛡️ Shield</div><div class="stage-text">' +
-            d.stages.shield +
-            '</div><span class="flag ' +
-            (d.status === "block" ? "block" : "pass") +
-            '">' +
-            (d.status === "block" ? "✕ BLOCKED" : "✓ PASS") +
-            "</span></div>" +
-            '<div class="stage"><div class="stage-title" style="color:#2dd4bf">🐚 Compress</div><div class="stage-text">' +
-            d.stages.compress +
-            "</div></div>" +
-            '<div class="stage"><div class="stage-title" style="color:#7c3aed">🐬 Audit</div><div class="stage-text">' +
-            d.stages.audit +
-            "</div></div>";
-          pp.classList.add("visible");
-          ip.classList.remove("visible");
-        } else {
-          ip.classList.remove("visible");
-          pp.classList.remove("visible");
+        } catch (e) {
+          console.warn("updatePanels error:", e);
         }
-        legendEl.querySelectorAll(".item").forEach(function (el) {
-          el.classList.toggle("active", el.dataset.id === selectedLayer);
-        });
       }
 
       // Heartbeat (reused from SIREN showcase)
@@ -2293,7 +2301,10 @@
             // Another agent is selected — highlight related agents
             var sameGroup =
               l.group === selectedLayerObj.group && l.group !== "dead";
-            var sameRole = l.role === selectedLayerObj.role;
+            // 🚨 CRITICAL: Use ROLE_MAP, not l.role (which is undefined)
+            var sameRole =
+              (ROLE_MAP[l.id] || "blocker") ===
+              (ROLE_MAP[selectedLayerObj.id] || "blocker");
             if (sameGroup && sameRole)
               alpha = 0.65; // Both match: brightest relatives
             else if (sameGroup) alpha = 0.5; // Same Knowledge Domain: 50%
