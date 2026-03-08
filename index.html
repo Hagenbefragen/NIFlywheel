@@ -375,9 +375,46 @@
         color: #fff;
         border-color: rgba(45, 212, 191, 0.3);
       }
+      .crt-overlay {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        pointer-events: none;
+        background: linear-gradient(
+            rgba(18, 16, 16, 0) 50%,
+            rgba(0, 0, 0, 0.25) 50%
+          ),
+          linear-gradient(
+            90deg,
+            rgba(255, 0, 0, 0.05),
+            rgba(0, 255, 0, 0.01),
+            rgba(0, 0, 255, 0.05)
+          );
+        background-size: 100% 4px, 3px 100%;
+        z-index: 100;
+        opacity: 0.5;
+      }
+      .vignette {
+        position: absolute;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        pointer-events: none;
+        background: radial-gradient(
+          circle,
+          rgba(0, 0, 0, 0) 60%,
+          rgba(0, 0, 0, 0.7) 100%
+        );
+        z-index: 101;
+      }
     </style>
   </head>
   <body>
+    <div class="crt-overlay"></div>
+    <div class="vignette"></div>
     <canvas id="scene"></canvas>
     <div id="phase-label">NI Stack — Living Ecosystem</div>
     <div id="layer-count"></div>
@@ -530,12 +567,73 @@
       var ctx = canvas.getContext("2d");
       var W,
         H,
+        activeMouseX = 0.5,
+        activeMouseY = 0.5,
         mouseX = 0.5,
         mouseY = 0.5,
         selectedLayer = null,
         selectedPrompt = null,
         hoveredPromptIdx = -1;
       var activePhase = "all";
+
+      var stars = [];
+      for (var si = 0; si < 400; si++) {
+        stars.push({
+          x: Math.random() * 8000 - 4000,
+          y: Math.random() * 4000 - 2000,
+          z: Math.random() * 3 + 1.2,
+          alpha: Math.random() * 0.4 + 0.05,
+        });
+      }
+
+      var audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      var audioEnabled = false;
+      window.addEventListener("click", function () {
+        if (audioCtx.state === "suspended") audioCtx.resume();
+        audioEnabled = true;
+      });
+
+      function playSound(type) {
+        if (!audioEnabled || audioCtx.state !== "running") return;
+        var osc = audioCtx.createOscillator();
+        var gainNode = audioCtx.createGain();
+        osc.connect(gainNode);
+        gainNode.connect(audioCtx.destination);
+        var now = audioCtx.currentTime;
+        if (type === "ting") {
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(1200, now);
+          osc.frequency.exponentialRampToValueAtTime(3200, now + 0.1);
+          gainNode.gain.setValueAtTime(0.04, now);
+          gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
+          osc.start(now);
+          osc.stop(now + 0.3);
+        } else if (type === "thrum") {
+          osc.type = "sine";
+          osc.frequency.setValueAtTime(50, now);
+          osc.frequency.exponentialRampToValueAtTime(30, now + 0.6);
+          gainNode.gain.setValueAtTime(0.2, now);
+          gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+          osc.start(now);
+          osc.stop(now + 0.6);
+        } else if (type === "zap") {
+          osc.type = "sawtooth";
+          osc.frequency.setValueAtTime(300, now);
+          osc.frequency.linearRampToValueAtTime(50, now + 0.1);
+          gainNode.gain.setValueAtTime(0.02, now);
+          gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
+          osc.start(now);
+          osc.stop(now + 0.1);
+        } else if (type === "snip") {
+          osc.type = "square";
+          osc.frequency.setValueAtTime(1000, now);
+          osc.frequency.exponentialRampToValueAtTime(2500, now + 0.05);
+          gainNode.gain.setValueAtTime(0.03, now);
+          gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
+          osc.start(now);
+          osc.stop(now + 0.05);
+        }
+      }
 
       function resize() {
         W = canvas.width = window.innerWidth;
@@ -544,6 +642,8 @@
       resize();
       window.addEventListener("resize", resize);
       window.addEventListener("mousemove", function (e) {
+        activeMouseX = e.clientX;
+        activeMouseY = e.clientY;
         mouseX = e.clientX / W;
         mouseY = e.clientY / H;
       });
@@ -1130,6 +1230,7 @@
       }
 
       function spawnLightning(x1, y1, x2, y2) {
+        playSound("zap");
         lightningBolts.push({ x1: x1, y1: y1, x2: x2, y2: y2, life: 1.0 });
       }
 
@@ -1167,6 +1268,7 @@
       }
 
       function spawnCrisprCut(x, y) {
+        playSound("snip");
         crisprCuts.push({ x: x, y: y, life: 1.0, rot: 0 });
         for (var i = 0; i < 6; i++) {
           crisprLetters.push({
@@ -1181,6 +1283,7 @@
       }
 
       function spawnCrystal(x, y) {
+        playSound("ting");
         crystals.push({
           x: x,
           y: y,
@@ -1207,6 +1310,7 @@
       }
 
       function spawnEventHorizon(x, y) {
+        playSound("thrum");
         eventHorizons.push({ x: x, y: y, life: 1.0, radius: 0 });
       }
 
@@ -2025,16 +2129,21 @@
           cy = H / 2,
           px = (mouseX - 0.5) * 40,
           py = (mouseY - 0.5) * 25;
-        // Stars
+        // Quantum Foam Parallax
         ctx.fillStyle = "#fff";
         for (var i = 0; i < stars.length; i++) {
           var st = stars[i];
-          ctx.globalAlpha = st.a + Math.sin(t * 0.001 + st.x) * 0.08;
+          var sx = ((st.x + currentPanX / st.z + 8000) % 8000) - 4000;
+          var baseAlpha = Math.max(
+            0,
+            st.alpha + Math.sin(t * 0.001 * (1 / st.z) + st.x) * 0.1,
+          );
+          ctx.globalAlpha = baseAlpha;
           ctx.beginPath();
           ctx.arc(
-            cx + st.x + px * 0.3,
-            cy + st.y + py * 0.3,
-            st.s,
+            cx + sx + px * (0.3 / st.z),
+            cy + st.y + py * (0.3 / st.z),
+            1.5 / Math.sqrt(st.z),
             0,
             Math.PI * 2,
           );
@@ -2759,6 +2868,58 @@
         drawScientificAnimations(ctx);
         // Energy/Tree Visualizer at bottom
         drawBottomPlanted(ctx);
+
+        // --- Magnifying Glass (Eye of Providence) ---
+        if (activeMouseX > 0 && activeMouseY > 0) {
+          ctx.strokeStyle = "rgba(45, 212, 191, 0.4)";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.arc(activeMouseX, activeMouseY, 80, 0, Math.PI * 2);
+          ctx.stroke();
+          // Inner glow
+          ctx.fillStyle = "rgba(45, 212, 191, 0.03)";
+          ctx.fill();
+          // Crosshairs
+          ctx.beginPath();
+          ctx.moveTo(activeMouseX - 90, activeMouseY);
+          ctx.lineTo(activeMouseX + 90, activeMouseY);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(activeMouseX, activeMouseY - 90);
+          ctx.lineTo(activeMouseX, activeMouseY + 90);
+          ctx.stroke();
+
+          // Typing Effect if hovered
+          if (hoveredPromptIdx >= 0 && flowingPrompts[hoveredPromptIdx]) {
+            var hp = flowingPrompts[hoveredPromptIdx];
+            var hpsx = cx + hp.x * currentZoom + px * 0.3 + currentPanX;
+            var hpsy = cy + hp.y * currentZoom + py * 0.3;
+            var text = hp.data.original || "UNKNOWN_DATA_NODE";
+            if (text.length > 55) text = text.substring(0, 52) + "...";
+
+            // Background blur pill for tooltip
+            ctx.fillStyle = "rgba(5, 10, 20, 0.85)";
+            ctx.fillRect(hpsx + 25, hpsy - 45, 300, 45);
+            ctx.strokeStyle = "rgba(16, 185, 129, 0.5)";
+            ctx.strokeRect(hpsx + 25, hpsy - 45, 300, 45);
+
+            ctx.font = "11px 'JetBrains Mono', monospace";
+            ctx.textAlign = "left";
+            ctx.fillStyle = "rgba(16, 185, 129, 0.9)";
+            ctx.fillText("> " + text, hpsx + 35, hpsy - 28);
+
+            ctx.font = "9px 'JetBrains Mono', monospace";
+            ctx.fillStyle = "rgba(16, 185, 129, 0.5)";
+            var hexBytes = Array.from(text)
+              .map(function (c) {
+                return c.charCodeAt(0).toString(16).padStart(2, "0");
+              })
+              .join(" ")
+              .substring(0, 45);
+            ctx.fillText("RAW_HEX: " + hexBytes, hpsx + 35, hpsy - 12);
+          }
+        }
+
         requestAnimationFrame(render);
       }
 
