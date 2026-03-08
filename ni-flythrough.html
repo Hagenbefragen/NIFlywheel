@@ -2108,7 +2108,7 @@
           ALL_LAYERS.forEach(function (l) {
             if (
               Math.sqrt((mx - l._sx) ** 2 + (my - l._sy) ** 2) < l._r + 6 &&
-              l._alpha > 0.03
+              l._alpha > 0.08
             ) {
               selectedLayer = selectedLayer === l.id ? null : l.id;
               selectedPrompt = null;
@@ -2450,11 +2450,12 @@
               (ROLE_MAP[l.id] || "blocker") ===
               (ROLE_MAP[selectedLayerObj.id] || "blocker");
             if (sameGroup && sameRole)
-              alpha = 0.7; // Both match: brightest relatives
-            else if (sameGroup) alpha = 0.55; // Same Knowledge Domain
-            else if (sameRole) alpha = 0.45; // Same Role
-            else if (act.active) alpha = 0.25; // Active but unrelated
-            else alpha = 0.15; // 🚨 Keep visible! Was 0.03 = invisible
+              alpha = 0.8; // Both match: brightest relatives
+            else if (sameGroup) alpha = 0.6; // Same Knowledge Domain
+            else if (sameRole) alpha = 0.55; // Same Role
+            else if (act.active) alpha = 0.4; // Active but unrelated
+            // 🚨 CRITICAL: Keep at 0.3 minimum! Lower values make canvas look dead
+            else alpha = 0.3;
           } else if (!l.wired) alpha = 0.12; // Planned: ghostly
           else if (act.active) alpha = 0.3 + act.intensity * 0.7;
           else alpha = testRunning ? 0.1 : 0.05; // Dormant when no prompts flowing
