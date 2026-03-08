@@ -590,6 +590,50 @@
 
       var totalBlockedEver = 0;
       var bottomPlanted = []; // { x, type, stage }
+      var gardenFlowers = []; // { x, hue, size, age, maxAge }
+      var gardenButterflies = []; // { x, y, vx, vy, wingPhase, hue, life }
+      var gardenBees = []; // { x, y, vx, vy, buzzPhase, life }
+      var sirenArcs = []; // { sx, sy, ex, ey, t, maxT } — visible feedback arcs
+
+      function spawnGardenFlower(screenX) {
+        gardenFlowers.push({
+          x: Math.max(30, Math.min(screenX || Math.random() * W, W - 30)),
+          hue: 280 + Math.random() * 80,
+          size: 3 + Math.random() * 4,
+          age: 0,
+          maxAge: 800 + Math.random() * 400,
+        });
+        if (gardenFlowers.length > 50) gardenFlowers.shift();
+      }
+      function spawnGardenButterfly(screenX) {
+        var gY = H - 70;
+        gardenButterflies.push({
+          x: screenX || Math.random() * W,
+          y: gY - 20 - Math.random() * 40,
+          vx: (Math.random() - 0.5) * 1.5,
+          vy: -0.3 - Math.random() * 0.5,
+          wingPhase: Math.random() * Math.PI * 2,
+          hue: 30 + Math.random() * 300,
+          life: 400 + Math.random() * 300,
+        });
+        if (gardenButterflies.length > 20) gardenButterflies.shift();
+      }
+      function spawnGardenBee(screenX) {
+        var gY = H - 70;
+        gardenBees.push({
+          x: screenX || Math.random() * W,
+          y: gY - 15 - Math.random() * 30,
+          vx: (Math.random() - 0.5) * 2,
+          vy: -0.2 - Math.random() * 0.3,
+          buzzPhase: Math.random() * Math.PI * 2,
+          life: 500 + Math.random() * 400,
+        });
+        if (gardenBees.length > 15) gardenBees.shift();
+      }
+      function spawnSirenArc(sx, sy, ex, ey) {
+        sirenArcs.push({ sx: sx, sy: sy, ex: ex, ey: ey, t: 0, maxT: 90 });
+        if (sirenArcs.length > 5) sirenArcs.shift();
+      }
 
       var PHI = 1.618033988749;
       var canvas = document.getElementById("scene");
@@ -2515,19 +2559,22 @@
                 fp._sirenReturn = true;
                 fp._cascadeIdx = 0; // Reset cascade for re-scan
 
+                var arcSX = cx + fp.x * currentZoom + px * 0.3 + currentPanX;
+                var arcSY = cy + fp.y * currentZoom + py * 0.3;
                 // --- 4. SIREN Ripple Trigger ---
-                spawnSirenRipple(
-                  cx + fp.x * currentZoom + px * 0.3 + currentPanX,
-                  cy + fp.y * currentZoom + py * 0.3,
-                );
+                spawnSirenRipple(arcSX, arcSY);
                 // 12. Magnetic Repulsion
-                spawnMagneticField(
-                  cx + fp.x * currentZoom + px * 0.3 + currentPanX,
-                  cy + fp.y * currentZoom + py * 0.3,
-                );
+                spawnMagneticField(arcSX, arcSY);
+
+                var newY = (Math.random() - 0.5) * H * 0.3;
+                var arcEX =
+                  cx + (-W / 2 - 30) * currentZoom + px * 0.3 + currentPanX;
+                var arcEY = cy + newY * currentZoom + py * 0.3;
+                // 🌀 Visible SIREN feedback arc
+                spawnSirenArc(arcSX, arcSY, arcEX, arcEY);
 
                 fp.x = -W / 2 - 30;
-                fp.y = (Math.random() - 0.5) * H * 0.3;
+                fp.y = newY;
               } else {
                 // Normal completion: prompt reaches the end, explode into nature if NI!
                 if (energyMode === "ni") {
@@ -2572,15 +2619,19 @@
             !fp._blocked
           ) {
             // 6. Harmonic Crystal on entering audit (alignment)
-            spawnCrystal(
-              cx + fp.x * currentZoom + px * 0.3 + currentPanX,
-              cy + fp.y * currentZoom + py * 0.3,
-            );
-            // 8. Event Horizon! (Happens when it enters LLM Box right before Audit)
-            spawnEventHorizon(
-              cx + fp.x * currentZoom + px * 0.3 + currentPanX,
-              cy + fp.y * currentZoom + py * 0.3,
-            );
+            var asx = cx + fp.x * currentZoom + px * 0.3 + currentPanX;
+            var asy = cy + fp.y * currentZoom + py * 0.3;
+            spawnCrystal(asx, asy);
+            // 8. Event Horizon!
+            spawnEventHorizon(asx, asy);
+
+            // 🌸 PERMACULTURE GARDEN — spawn creatures based on compression ratio
+            var compStr = fp.data.stages.compress || "";
+            var compMatch = compStr.match(/(\d+)%/);
+            var compRatio = compMatch ? parseInt(compMatch[1]) : 0;
+            if (compRatio >= 50) spawnGardenFlower(asx);
+            if (compRatio >= 60) spawnGardenButterfly(asx);
+            if (compRatio >= 70) spawnGardenBee(asx);
           }
           fp._lastPhase = promptPhase;
 
@@ -3036,20 +3087,223 @@
           else drawReactor(ctx, px, localY, p.stage, t);
         }
 
-        // === AMBIENT PARTICLES ===
-        for (var k = 0; k < 12; k++) {
-          var fx = (t * 15 + k * 113.7) % W;
-          var fy = gY - 8 + Math.sin(t * 1.8 + k * 1.7) * 18;
-          var fa = 0.2 + Math.sin(t * 2.5 + k * 2.3) * 0.25;
-          if (fa > 0) {
+        // === 🌸 FLOWERS (compression > 50%) ===
+        for (var fi = gardenFlowers.length - 1; fi >= 0; fi--) {
+          var fl = gardenFlowers[fi];
+          fl.age++;
+          if (fl.age > fl.maxAge) {
+            gardenFlowers.splice(fi, 1);
+            continue;
+          }
+          var fgi = (fl.x / W) * segs;
+          var flY =
+            gY +
+            Math.sin(fgi * 0.7 + t * 0.15) * 5 +
+            Math.sin(fgi * 1.4 + 0.7) * 3 +
+            Math.sin(fgi * 0.25 + t * 0.08) * 4;
+          var bloom = Math.min(1, fl.age / 60); // grows over 60 frames
+          var fade = fl.age > fl.maxAge - 100 ? (fl.maxAge - fl.age) / 100 : 1;
+          ctx.save();
+          ctx.globalAlpha = fade * 0.85;
+          // Stem
+          var stemH = fl.size * 2.5 * bloom;
+          ctx.strokeStyle = "rgba(34,197,94,0.6)";
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.moveTo(fl.x, flY);
+          ctx.lineTo(fl.x, flY - stemH);
+          ctx.stroke();
+          // Petals
+          var r = fl.size * bloom;
+          for (var p = 0; p < 5; p++) {
+            var pa = (p / 5) * Math.PI * 2 + t * 0.3;
+            ctx.fillStyle = "hsla(" + fl.hue + ",70%,65%," + 0.6 * fade + ")";
             ctx.beginPath();
-            ctx.arc(fx, fy, 1.2, 0, Math.PI * 2);
-            ctx.fillStyle = isNI
-              ? "rgba(134,239,172," + fa + ")"
-              : "rgba(252,165,165," + fa + ")";
+            ctx.ellipse(
+              fl.x + Math.cos(pa) * r * 0.6,
+              flY - stemH + Math.sin(pa) * r * 0.6,
+              r * 0.45,
+              r * 0.25,
+              pa,
+              0,
+              Math.PI * 2,
+            );
             ctx.fill();
           }
+          // Center
+          ctx.fillStyle = "rgba(250,204,21," + 0.8 * fade + ")";
+          ctx.beginPath();
+          ctx.arc(fl.x, flY - stemH, r * 0.25, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.restore();
         }
+
+        // === 🦋 BUTTERFLIES (compression > 60%) ===
+        for (var bi = gardenButterflies.length - 1; bi >= 0; bi--) {
+          var bf = gardenButterflies[bi];
+          bf.life--;
+          if (bf.life <= 0) {
+            gardenButterflies.splice(bi, 1);
+            continue;
+          }
+          bf.wingPhase += 0.15;
+          bf.x += bf.vx + Math.sin(t * 2 + bi) * 0.5;
+          bf.y += bf.vy + Math.sin(t * 1.5 + bi * 1.3) * 0.4;
+          bf.vy += 0.005; // gentle gravity
+          // Wrap horizontally
+          if (bf.x < 0) bf.x = W;
+          if (bf.x > W) bf.x = 0;
+          if (bf.y > gY - 5) {
+            bf.y = gY - 5;
+            bf.vy = -0.8;
+          }
+          var fade = Math.min(1, bf.life / 80);
+          ctx.save();
+          ctx.globalAlpha = fade * 0.8;
+          var wingSpan = 6 * Math.abs(Math.sin(bf.wingPhase));
+          // Left wing
+          ctx.fillStyle = "hsla(" + bf.hue + ",80%,60%," + 0.7 * fade + ")";
+          ctx.beginPath();
+          ctx.ellipse(
+            bf.x - wingSpan * 0.5,
+            bf.y,
+            wingSpan,
+            3,
+            -0.3,
+            0,
+            Math.PI * 2,
+          );
+          ctx.fill();
+          // Right wing
+          ctx.fillStyle =
+            "hsla(" + ((bf.hue + 30) % 360) + ",80%,60%," + 0.7 * fade + ")";
+          ctx.beginPath();
+          ctx.ellipse(
+            bf.x + wingSpan * 0.5,
+            bf.y,
+            wingSpan,
+            3,
+            0.3,
+            0,
+            Math.PI * 2,
+          );
+          ctx.fill();
+          // Body
+          ctx.fillStyle = "rgba(40,40,40," + 0.8 * fade + ")";
+          ctx.beginPath();
+          ctx.ellipse(bf.x, bf.y, 1.5, 3, 0, 0, Math.PI * 2);
+          ctx.fill();
+          // Antenna
+          ctx.strokeStyle = "rgba(100,100,100," + 0.5 * fade + ")";
+          ctx.lineWidth = 0.5;
+          ctx.beginPath();
+          ctx.moveTo(bf.x, bf.y - 3);
+          ctx.lineTo(bf.x - 2, bf.y - 6);
+          ctx.moveTo(bf.x, bf.y - 3);
+          ctx.lineTo(bf.x + 2, bf.y - 6);
+          ctx.stroke();
+          ctx.restore();
+        }
+
+        // === 🐝 BUMBLEBEES (QFAI compression > 70%) ===
+        for (var bei = gardenBees.length - 1; bei >= 0; bei--) {
+          var bee = gardenBees[bei];
+          bee.life--;
+          if (bee.life <= 0) {
+            gardenBees.splice(bei, 1);
+            continue;
+          }
+          bee.buzzPhase += 0.25;
+          bee.x += bee.vx + Math.sin(t * 5 + bei * 2) * 1.2; // fast zigzag
+          bee.y += bee.vy + Math.sin(t * 4 + bei) * 0.8;
+          if (bee.x < 0) bee.x = W;
+          if (bee.x > W) bee.x = 0;
+          if (bee.y > gY - 5) {
+            bee.y = gY - 5;
+            bee.vy = -1;
+          }
+          if (bee.y < gY - 60) bee.vy += 0.05;
+          var fade = Math.min(1, bee.life / 80);
+          ctx.save();
+          ctx.globalAlpha = fade * 0.85;
+          // Body (yellow-black stripes)
+          ctx.fillStyle = "rgba(250,204,21," + 0.9 * fade + ")";
+          ctx.beginPath();
+          ctx.ellipse(bee.x, bee.y, 4, 2.5, 0, 0, Math.PI * 2);
+          ctx.fill();
+          // Black stripes
+          ctx.fillStyle = "rgba(30,30,30," + 0.7 * fade + ")";
+          ctx.fillRect(bee.x - 1.5, bee.y - 2.5, 1, 5);
+          ctx.fillRect(bee.x + 1, bee.y - 2.5, 1, 5);
+          // Wings (buzz)
+          var wf = Math.abs(Math.sin(bee.buzzPhase));
+          ctx.fillStyle = "rgba(200,220,255," + 0.4 * fade * wf + ")";
+          ctx.beginPath();
+          ctx.ellipse(bee.x - 1, bee.y - 2, 3 * wf, 4, -0.4, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.ellipse(bee.x + 1, bee.y - 2, 3 * wf, 4, 0.4, 0, Math.PI * 2);
+          ctx.fill();
+          // Glow trail
+          ctx.shadowColor = "rgba(250,204,21,0.3)";
+          ctx.shadowBlur = 6;
+          ctx.beginPath();
+          ctx.arc(bee.x, bee.y, 1, 0, Math.PI * 2);
+          ctx.fillStyle = "rgba(250,204,21,0.5)";
+          ctx.fill();
+          ctx.shadowBlur = 0;
+          ctx.restore();
+        }
+
+        // === 🌀 SIREN FEEDBACK ARCS ===
+        for (var si = sirenArcs.length - 1; si >= 0; si--) {
+          var sa = sirenArcs[si];
+          sa.t++;
+          if (sa.t > sa.maxT) {
+            sirenArcs.splice(si, 1);
+            continue;
+          }
+          var prog = sa.t / sa.maxT;
+          var fade = prog < 0.8 ? 1 : (1 - prog) / 0.2;
+          ctx.save();
+          ctx.globalAlpha = fade * 0.6;
+          ctx.strokeStyle = "rgba(124,58,237,0.7)";
+          ctx.lineWidth = 2;
+          ctx.setLineDash([4, 3]);
+          // Draw bezier arc from SIREN (right) back to AEGIS (left)
+          var cpY = Math.min(sa.sy, sa.ey) - 120; // arc above
+          ctx.beginPath();
+          ctx.moveTo(sa.sx, sa.sy);
+          ctx.quadraticCurveTo((sa.sx + sa.ex) / 2, cpY, sa.ex, sa.ey);
+          ctx.stroke();
+          // Moving dot along the arc
+          var dt = prog;
+          var dotX =
+            (1 - dt) * (1 - dt) * sa.sx +
+            2 * (1 - dt) * dt * ((sa.sx + sa.ex) / 2) +
+            dt * dt * sa.ex;
+          var dotY =
+            (1 - dt) * (1 - dt) * sa.sy +
+            2 * (1 - dt) * dt * cpY +
+            dt * dt * sa.ey;
+          ctx.setLineDash([]);
+          ctx.fillStyle = "rgba(167,139,250,0.9)";
+          ctx.shadowColor = "rgba(167,139,250,0.5)";
+          ctx.shadowBlur = 8;
+          ctx.beginPath();
+          ctx.arc(dotX, dotY, 3, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+          // Label
+          if (prog > 0.3 && prog < 0.7) {
+            ctx.font = "9px Inter";
+            ctx.fillStyle = "rgba(167,139,250," + fade + ")";
+            ctx.textAlign = "center";
+            ctx.fillText("🌀 SIREN FEEDBACK", dotX, dotY - 10);
+          }
+          ctx.restore();
+        }
+
         ctx.restore();
         ctx.globalAlpha = 1;
       }
