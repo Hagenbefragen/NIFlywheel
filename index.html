@@ -1114,6 +1114,127 @@
         ctx.globalAlpha = 1;
       }
 
+      // --- SCIENTIFIC ANIMATIONS ---
+      var goldenSpirals = [];
+      var lightningBolts = [];
+      var myceliumPulses = [];
+
+      function spawnGoldenSpiral(x, y) {
+        goldenSpirals.push({
+          x: x,
+          y: y,
+          life: 1.0,
+          scale: 0,
+          rot: Math.random() * Math.PI * 2,
+        });
+      }
+
+      function spawnLightning(x1, y1, x2, y2) {
+        lightningBolts.push({ x1: x1, y1: y1, x2: x2, y2: y2, life: 1.0 });
+      }
+
+      function spawnMyceliumPulse(cx, cy, px, py, agentId) {
+        var a = ALL_LAYERS.find(function (l) {
+          return l.id === agentId;
+        });
+        if (!a || a.group === "dead") return;
+        ALL_LAYERS.forEach(function (b) {
+          if (a.group === b.group && a.id !== b.id && b.group !== "dead") {
+            var Math_dist = Math.sqrt(
+              (a._sx - b._sx) ** 2 + (a._sy - b._sy) ** 2,
+            );
+            // We use the already computed screen positions a._sx, a._sy, b._sx, b._sy
+            if (Math_dist < 150) {
+              myceliumPulses.push({
+                sx: a._sx,
+                sy: a._sy,
+                ex: b._sx,
+                ey: b._sy,
+                life: 1.0,
+              });
+            }
+          }
+        });
+      }
+
+      function drawScientificAnimations(ctx) {
+        // 1. Mycelium Pulses
+        for (var i = myceliumPulses.length - 1; i >= 0; i--) {
+          var p = myceliumPulses[i];
+          p.life -= 0.015;
+          if (p.life <= 0) {
+            myceliumPulses.splice(i, 1);
+            continue;
+          }
+          var prog = 1.0 - p.life; // 0 to 1
+          var curX = p.sx + (p.ex - p.sx) * prog;
+          var curY = p.sy + (p.ey - p.sy) * prog;
+
+          ctx.globalAlpha = Math.sin(p.life * Math.PI); // Smooth fade in/out
+          ctx.shadowBlur = 15;
+          ctx.shadowColor = "#f97316";
+          ctx.fillStyle = "#fdba74";
+          ctx.beginPath();
+          ctx.arc(curX, curY, 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // 2. Bayesian Lightning
+        for (var i = lightningBolts.length - 1; i >= 0; i--) {
+          var p = lightningBolts[i];
+          p.life -= 0.04;
+          if (p.life <= 0) {
+            lightningBolts.splice(i, 1);
+            continue;
+          }
+
+          ctx.globalAlpha = p.life;
+          ctx.shadowBlur = 10;
+          ctx.shadowColor = "#38bdf8";
+          ctx.strokeStyle = "#bae6fd";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          var steps = 8;
+          ctx.moveTo(p.x1, p.y1);
+          for (var j = 1; j < steps; j++) {
+            var t = j / steps;
+            var bx = p.x1 + (p.x2 - p.x1) * t + (Math.random() - 0.5) * 30;
+            var by = p.y1 + (p.y2 - p.y1) * t + (Math.random() - 0.5) * 30;
+            ctx.lineTo(bx, by);
+          }
+          ctx.lineTo(p.x2, p.y2);
+          ctx.stroke();
+        }
+
+        // 3. Golden Spiral
+        for (var i = goldenSpirals.length - 1; i >= 0; i--) {
+          var gs = goldenSpirals[i];
+          gs.life -= 0.008;
+          gs.scale += 0.3;
+          gs.rot += 0.03;
+          if (gs.life <= 0) {
+            goldenSpirals.splice(i, 1);
+            continue;
+          }
+
+          ctx.globalAlpha = gs.life * 0.8;
+          ctx.strokeStyle = "#fbbf24";
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          for (var j = 0; j < 50; j++) {
+            var t = j * 0.15;
+            var r = 1.5 * Math.pow(1.6180339, t);
+            var sx = gs.x + r * Math.cos(t + gs.rot) * (gs.scale * 0.05);
+            var sy = gs.y + r * Math.sin(t + gs.rot) * (gs.scale * 0.05);
+            if (j === 0) ctx.moveTo(sx, sy);
+            else ctx.lineTo(sx, sy);
+          }
+          ctx.stroke();
+        }
+        ctx.shadowBlur = 0;
+        ctx.globalAlpha = 1;
+      }
+
       // ═══ BROADCAST CHANNEL: Cross-Dashboard Prompt Bridge ═══
       try {
         window._niPromptBridge = new BroadcastChannel("ni-prompt-bridge");
@@ -1869,6 +1990,32 @@
               if (energyMode === "ni") {
                 spawnTree(bsx, bsy); // Drops leaves down into the Trust Tree
               }
+
+              // --- SCIENTIFIC ANIMATIONS TRIGGER ---
+              if (fp._flaggedAgents && fp._flaggedAgents.length > 0) {
+                // 1. Golden Spiral (if 2+ agents flag, Thermoballing)
+                if (fp._flaggedAgents.length >= 2) {
+                  spawnGoldenSpiral(bsx, bsy);
+                }
+
+                // Trigger Mycelium Pulses and Bayesian Lightning from each flagging agent
+                fp._flaggedAgents.forEach(function (agentId) {
+                  // Try to map real layer names to flythrough IDs if necessary, or just use agentId
+                  // First we map the layer ID just like the cascade
+                  var mappedId = LAYER_TO_AGENT
+                    ? LAYER_TO_AGENT[agentId] || agentId
+                    : agentId;
+                  var ag = ALL_LAYERS.find(function (l) {
+                    return l.id === mappedId;
+                  });
+                  if (ag) {
+                    // 2. Bayesian Lightning from agent to the prompt
+                    spawnLightning(ag._sx, ag._sy, bsx, bsy);
+                    // 3. Mycorrhizal Pulse to its neighbors
+                    spawnMyceliumPulse(cx, cy, px, py, mappedId);
+                  }
+                });
+              }
             }
           }
 
@@ -2163,6 +2310,8 @@
         drawHeartbeat(t);
         // Supernova particles (LLM hit effect)
         drawSupernovaParticles(ctx);
+        // Scientific Animations (Mycelium, Golden Spiral, Bayesian Lightning)
+        drawScientificAnimations(ctx);
         // Energy/Tree Visualizer at bottom
         drawBottomPlanted(ctx);
         requestAnimationFrame(render);
