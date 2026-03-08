@@ -1157,6 +1157,39 @@
         });
       }
 
+      var sirenRipples = [];
+      var crisprCuts = [];
+      var crisprLetters = [];
+      var crystals = [];
+
+      function spawnSirenRipple(x, y) {
+        sirenRipples.push({ x: x, y: y, life: 1.0, scale: 0 });
+      }
+
+      function spawnCrisprCut(x, y) {
+        crisprCuts.push({ x: x, y: y, life: 1.0, rot: 0 });
+        for (var i = 0; i < 6; i++) {
+          crisprLetters.push({
+            x: x + (Math.random() - 0.5) * 30,
+            y: y + (Math.random() - 0.5) * 30,
+            vx: (Math.random() - 0.5) * 3,
+            vy: Math.random() * 2 + 1,
+            char: ["A", "T", "C", "G", "U"][Math.floor(Math.random() * 5)],
+            life: 1.0,
+          });
+        }
+      }
+
+      function spawnCrystal(x, y) {
+        crystals.push({
+          x: x,
+          y: y,
+          life: 1.0,
+          scale: 0.1,
+          rot: Math.random() * Math.PI,
+        });
+      }
+
       function drawScientificAnimations(ctx) {
         // 1. Mycelium Pulses
         for (var i = myceliumPulses.length - 1; i >= 0; i--) {
@@ -1231,6 +1264,93 @@
           }
           ctx.stroke();
         }
+        // 4. SIREN Ripples
+        for (var i = sirenRipples.length - 1; i >= 0; i--) {
+          var sr = sirenRipples[i];
+          sr.life -= 0.01;
+          sr.scale += 2.5;
+          if (sr.life <= 0) {
+            sirenRipples.splice(i, 1);
+            continue;
+          }
+          ctx.globalAlpha = sr.life * 0.6;
+          ctx.strokeStyle = "#8b5cf6"; // Purple for SIREN
+          ctx.lineWidth = 3 * sr.life;
+          ctx.beginPath();
+          ctx.arc(sr.x, sr.y, sr.scale, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(sr.x, sr.y, sr.scale * 0.7, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(sr.x, sr.y, sr.scale * 0.4, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        // 5. CRISPR Cuts
+        for (var i = crisprCuts.length - 1; i >= 0; i--) {
+          var cut = crisprCuts[i];
+          cut.life -= 0.02;
+          cut.rot += 0.2;
+          if (cut.life <= 0) {
+            crisprCuts.splice(i, 1);
+            continue;
+          }
+          ctx.globalAlpha = cut.life;
+          ctx.font = "24px Arial";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          var cutChar = Math.cos(cut.rot) > 0 ? "✂️" : "✄";
+          ctx.fillStyle = "#fff";
+          ctx.fillText(cutChar, cut.x, cut.y - 20 - (1 - cut.life) * 20);
+        }
+        for (var i = crisprLetters.length - 1; i >= 0; i--) {
+          var l = crisprLetters[i];
+          l.life -= 0.02;
+          l.x += l.vx;
+          l.y += l.vy;
+          l.vy += 0.15; // gravity
+          if (l.life <= 0) {
+            crisprLetters.splice(i, 1);
+            continue;
+          }
+          ctx.globalAlpha = Math.max(0, l.life);
+          ctx.font = "bold 14px 'JetBrains Mono', monospace";
+          ctx.fillStyle = "#2dd4bf"; // Compress color
+          ctx.fillText(l.char, l.x, l.y);
+        }
+
+        // 6. Harmonic Crystal
+        for (var i = crystals.length - 1; i >= 0; i--) {
+          var cr = crystals[i];
+          cr.life -= 0.01;
+          cr.scale += (1 - cr.scale) * 0.1;
+          cr.rot += 0.01;
+          if (cr.life <= 0) {
+            crystals.splice(i, 1);
+            continue;
+          }
+          ctx.globalAlpha = cr.life * 0.8;
+          ctx.strokeStyle = "#a78bfa";
+          ctx.lineWidth = 2;
+          ctx.save();
+          ctx.translate(cr.x, cr.y);
+          ctx.rotate(cr.rot);
+          var size = 60 * cr.scale;
+          ctx.beginPath();
+          for (var branch = 0; branch < 6; branch++) {
+            ctx.moveTo(0, 0);
+            ctx.lineTo(0, size);
+            ctx.moveTo(0, size * 0.5);
+            ctx.lineTo(size * 0.3, size * 0.8);
+            ctx.moveTo(0, size * 0.5);
+            ctx.lineTo(-size * 0.3, size * 0.8);
+            ctx.rotate(Math.PI / 3);
+          }
+          ctx.stroke();
+          ctx.restore();
+        }
+
         ctx.shadowBlur = 0;
         ctx.globalAlpha = 1;
       }
@@ -1961,6 +2081,13 @@
                 // SIREN feedback: send back to AEGIS for re-scan (purple flash)
                 fp._sirenReturn = true;
                 fp._cascadeIdx = 0; // Reset cascade for re-scan
+
+                // --- 4. SIREN Ripple Trigger ---
+                spawnSirenRipple(
+                  cx + fp.x * currentZoom + px * 0.3 + currentPanX,
+                  cy + fp.y * currentZoom + py * 0.3,
+                );
+
                 fp.x = -W / 2 - 30;
                 fp.y = (Math.random() - 0.5) * H * 0.3;
               } else {
@@ -1977,6 +2104,32 @@
               }
             }
           }
+
+          // --- 5 & 6 Phase Transition Animations ---
+          fp._lastPhase = fp._lastPhase || promptPhase;
+          if (
+            fp._lastPhase === "shield" &&
+            promptPhase === "compress" &&
+            !fp._blocked
+          ) {
+            // 5. CRISPR Scissors on entering compression
+            spawnCrisprCut(
+              cx + fp.x * currentZoom + px * 0.3 + currentPanX,
+              cy + fp.y * currentZoom + py * 0.3,
+            );
+          }
+          if (
+            fp._lastPhase === "compress" &&
+            promptPhase === "audit" &&
+            !fp._blocked
+          ) {
+            // 6. Harmonic Crystal on entering audit (alignment)
+            spawnCrystal(
+              cx + fp.x * currentZoom + px * 0.3 + currentPanX,
+              cy + fp.y * currentZoom + py * 0.3,
+            );
+          }
+          fp._lastPhase = promptPhase;
 
           var isBlk = fp.data.status === "block";
           if (isBlk && promptPhase === "shield" && fp.x > -W * 0.05) {
