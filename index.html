@@ -409,10 +409,7 @@
       <select id="flm-select">
         <option value="ollama-mistral">🦙 Ollama Mistral 7B</option>
         <option value="ollama-llama3">🦙 Ollama LLaMA 3.1</option>
-        <option value="gpt4o">🟢 GPT-4o (OpenAI)</option>
-        <option value="claude">🟣 Claude 3.5 (Anthropic)</option>
-        <option value="gemini">🔵 Gemini 2.5 (Google)</option>
-        <option value="local-phi">💻 Local Phi-3 Mini</option>
+        <option value="ollama-phi3">💻 Ollama Phi-3 Mini</option>
       </select>
       <button id="run-btn" onclick="toggleTest()">▶ RUN</button>
     </div>
@@ -906,6 +903,77 @@
       var promptsSpawned = 0;
       var totalBlocked = 0;
       var totalPassed = 0;
+
+      // ═══ SUPERNOVA FLASH (LLM Hit Effect) ═══
+      var supernovaParticles = [];
+      function supernovaFlash(x, y) {
+        for (var i = 0; i < 12; i++) {
+          var angle = (Math.PI * 2 * i) / 12;
+          supernovaParticles.push({
+            x: x,
+            y: y,
+            vx: Math.cos(angle) * (2 + Math.random() * 3),
+            vy: Math.sin(angle) * (2 + Math.random() * 3),
+            life: 1.0,
+            size: 2 + Math.random() * 3,
+            hue: 180 + Math.random() * 60,
+          });
+        }
+      }
+      function drawSupernovaParticles(ctx) {
+        for (var i = supernovaParticles.length - 1; i >= 0; i--) {
+          var p = supernovaParticles[i];
+          p.x += p.vx;
+          p.y += p.vy;
+          p.life -= 0.02;
+          p.vx *= 0.97;
+          p.vy *= 0.97;
+          if (p.life <= 0) {
+            supernovaParticles.splice(i, 1);
+            continue;
+          }
+          ctx.globalAlpha = p.life * 0.8;
+          ctx.fillStyle = "hsl(" + p.hue + ",90%,70%)";
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
+          ctx.fill();
+          // glow ring
+          ctx.strokeStyle = "hsl(" + p.hue + ",100%,85%)";
+          ctx.lineWidth = 0.5;
+          ctx.beginPath();
+          ctx.arc(p.x, p.y, p.size * p.life * 2, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+        ctx.globalAlpha = 1;
+      }
+
+      // ═══ BROADCAST CHANNEL: Cross-Dashboard Prompt Bridge ═══
+      try {
+        window._niPromptBridge = new BroadcastChannel("ni-prompt-bridge");
+        window._niPromptBridge.onmessage = function (e) {
+          if (e.data && e.data.type === "inject_prompt" && !testRunning) {
+            // Received real prompt from analytical dashboard — inject into flythrough
+            var scenario = SCENARIOS[activeScenario] || SCENARIOS.mixed;
+            flowingPrompts.push({
+              x: -W / 2 - 50,
+              y: (Math.random() - 0.5) * H * 0.35,
+              speed: 1.2 + Math.random() * 0.8,
+              size: 4 + Math.random() * 3,
+              data: {
+                original: e.data.prompt || "Real prompt",
+                status: e.data.status || "pass",
+              },
+              _blocked: false,
+              _blockTimer: 0,
+              _phase: "shield",
+              _sirenReturn: false,
+              _supernovaFired: false,
+            });
+          }
+        };
+      } catch (ex) {
+        /* BroadcastChannel not supported */
+      }
 
       function toggleTest() {
         testRunning = !testRunning;
@@ -1567,8 +1635,24 @@
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
           ctx.fillStyle = "#fff";
-          ctx.fillText(fp._blocked ? "✕" : "⟡", sx, sy);
+          ctx.fillText(fp._blocked ? "✕" : fp._sirenReturn ? "↺" : "⟡", sx, sy);
           ctx.shadowBlur = 0;
+
+          // --- SUPERNOVA FLASH: when prompt hits COMPRESS (LLM) phase ---
+          if (promptPhase === "compress" && !fp._supernovaFired) {
+            fp._supernovaFired = true;
+            supernovaFlash(sx, sy);
+            // Broadcast to analytical dashboard
+            if (window._niPromptBridge) {
+              window._niPromptBridge.postMessage({
+                type: "llm_hit",
+                prompt: fp.data.original.substring(0, 60),
+                status: fp.data.status,
+                time: Date.now(),
+              });
+            }
+          }
+          if (promptPhase === "shield") fp._supernovaFired = false;
 
           if (inSlowZone || isSelected) {
             ctx.fillStyle = "rgba(255,255,255,0.85)";
@@ -1714,6 +1798,8 @@
         }
         // Heartbeat
         drawHeartbeat(t);
+        // Supernova particles (LLM hit effect)
+        drawSupernovaParticles(ctx);
         requestAnimationFrame(render);
       }
 
