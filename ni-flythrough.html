@@ -2960,80 +2960,245 @@
         requestAnimationFrame(render);
       }
 
+      // ═══ PERMACULTURE GARDEN — Living bottom landscape ═══
       function drawBottomPlanted(ctx) {
         if (bottomPlanted.length === 0) return;
-        ctx.globalAlpha = 0.9;
+        var t = Date.now() * 0.001;
+        var gY = H - 70;
+        ctx.save();
 
-        // Dynamic bottom bar with glow based on mode
-        var modeColor =
-          energyMode === "ni"
-            ? "rgba(16,185,129,0.15)"
-            : "rgba(239,68,68,0.15)";
-        var modeStroke =
-          energyMode === "ni" ? "rgba(16,185,129,0.3)" : "rgba(239,68,68,0.3)";
-        ctx.fillStyle = "rgba(10, 15, 30, 0.75)";
-        ctx.fillRect(0, H - 70, W, 70);
-        ctx.fillStyle = modeColor;
-        ctx.fillRect(0, H - 70, W, 70);
-
-        ctx.strokeStyle = modeStroke;
-        ctx.lineWidth = 1;
+        // === ROLLING TERRAIN ===
+        var isNI = energyMode === "ni";
+        var earthGrad = ctx.createLinearGradient(0, gY - 10, 0, H);
+        if (isNI) {
+          earthGrad.addColorStop(0, "rgba(22,78,42,0.88)");
+          earthGrad.addColorStop(0.35, "rgba(15,52,30,0.92)");
+          earthGrad.addColorStop(1, "rgba(5,20,10,0.96)");
+        } else {
+          earthGrad.addColorStop(0, "rgba(80,30,20,0.88)");
+          earthGrad.addColorStop(0.35, "rgba(50,20,15,0.92)");
+          earthGrad.addColorStop(1, "rgba(20,8,5,0.96)");
+        }
+        // Hill path
         ctx.beginPath();
-        ctx.moveTo(0, H - 70);
-        ctx.lineTo(W, H - 70);
-        ctx.stroke();
+        ctx.moveTo(0, H);
+        var segs = 40;
+        for (var i = 0; i <= segs; i++) {
+          var sx = (i / segs) * W;
+          var sy =
+            gY +
+            Math.sin(i * 0.7 + t * 0.15) * 5 +
+            Math.sin(i * 1.4 + 0.7) * 3 +
+            Math.sin(i * 0.25 + t * 0.08) * 4;
+          ctx.lineTo(sx, sy);
+        }
+        ctx.lineTo(W, H);
+        ctx.closePath();
+        ctx.fillStyle = earthGrad;
+        ctx.fill();
 
-        for (var i = 0; i < bottomPlanted.length; i++) {
-          var p = bottomPlanted[i];
-          var px = p.x % (W - 100);
-          var py = H - 35 - Math.floor(p.x / (W - 100)) * 50;
+        // Grass blades along terrain edge
+        for (var i = 0; i < W; i += 6) {
+          var gi = (i / W) * segs;
+          var baseY =
+            gY +
+            Math.sin(gi * 0.7 + t * 0.15) * 5 +
+            Math.sin(gi * 1.4 + 0.7) * 3 +
+            Math.sin(gi * 0.25 + t * 0.08) * 4;
+          var sway = Math.sin(t * 2 + i * 0.05) * 2;
+          var bh = 4 + Math.sin(i * 0.3) * 3;
+          ctx.strokeStyle = isNI
+            ? "rgba(34,197,94," + (0.15 + Math.sin(i * 0.1) * 0.08) + ")"
+            : "rgba(239,68,68," + (0.1 + Math.sin(i * 0.1) * 0.05) + ")";
+          ctx.lineWidth = 0.8;
+          ctx.beginPath();
+          ctx.moveTo(i, baseY);
+          ctx.quadraticCurveTo(
+            i + sway,
+            baseY - bh * 0.6,
+            i + sway * 1.2,
+            baseY - bh,
+          );
+          ctx.stroke();
+        }
 
-          ctx.font = "28px Arial";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
+        // === PLANTED ITEMS ===
+        for (var j = 0; j < bottomPlanted.length; j++) {
+          var p = bottomPlanted[j];
+          var px = (p.x % (W - 60)) + 30;
+          var gi2 = (px / W) * segs;
+          var localY =
+            gY +
+            Math.sin(gi2 * 0.7 + t * 0.15) * 5 +
+            Math.sin(gi2 * 1.4 + 0.7) * 3 +
+            Math.sin(gi2 * 0.25 + t * 0.08) * 4;
+          if (p.type === "tree") drawGardenTree(ctx, px, localY, p.stage, t);
+          else drawReactor(ctx, px, localY, p.stage, t);
+        }
 
-          if (p.type === "tree") {
-            if (p.stage < 4) ctx.fillText("🌱", px, py - 5);
-            else if (p.stage < 8) ctx.fillText("🌿", px, py - 5);
-            else {
-              ctx.fillText("🌳", px, py - 5);
-              ctx.shadowColor = "rgba(34,197,94,0.5)";
-              ctx.shadowBlur = 10;
-              ctx.fillText("🌳", px, py - 5);
-              ctx.shadowBlur = 0;
-            }
+        // === AMBIENT PARTICLES ===
+        for (var k = 0; k < 12; k++) {
+          var fx = (t * 15 + k * 113.7) % W;
+          var fy = gY - 8 + Math.sin(t * 1.8 + k * 1.7) * 18;
+          var fa = 0.2 + Math.sin(t * 2.5 + k * 2.3) * 0.25;
+          if (fa > 0) {
+            ctx.beginPath();
+            ctx.arc(fx, fy, 1.2, 0, Math.PI * 2);
+            ctx.fillStyle = isNI
+              ? "rgba(134,239,172," + fa + ")"
+              : "rgba(252,165,165," + fa + ")";
+            ctx.fill();
+          }
+        }
+        ctx.restore();
+        ctx.globalAlpha = 1;
+      }
 
-            if (p.stage < 10) {
-              ctx.font = "9px Inter";
-              ctx.fillStyle = "#10b981";
-              ctx.fillText(p.stage + "/10", px, py + 18);
-            } else {
-              ctx.font = "10px Inter";
-              ctx.fillStyle = "#10b981";
-              ctx.fillText("-200kWh", px, py + 18);
-            }
-          } else {
-            if (p.stage < 5) ctx.fillText("🏗️", px, py - 5);
-            else {
-              ctx.fillText("☢️", px, py - 5);
-              ctx.shadowColor = "rgba(239,68,68,0.5)";
-              ctx.shadowBlur = 15;
-              ctx.fillText("☢️", px, py - 5);
-              ctx.shadowBlur = 0;
-            }
-
-            if (p.stage < 10) {
-              ctx.font = "9px Inter";
-              ctx.fillStyle = "#ef4444";
-              ctx.fillText(p.stage + "/10", px, py + 18);
-            } else {
-              ctx.font = "10px Inter";
-              ctx.fillStyle = "#ef4444";
-              ctx.fillText("+5kW GPU", px, py + 18);
+      function drawGardenTree(ctx, x, y, stage, t) {
+        ctx.save();
+        var sw = Math.sin(t * 1.2 + x * 0.012) * 2.5;
+        ctx.textAlign = "center";
+        if (stage < 3) {
+          // Seedling — small stem + leaf
+          ctx.strokeStyle = "#86efac";
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.lineTo(x + sw * 0.3, y - 6 - stage * 2);
+          ctx.stroke();
+          ctx.fillStyle = "rgba(34,197,94,0.7)";
+          ctx.beginPath();
+          ctx.ellipse(
+            x + sw * 0.3 + 2,
+            y - 8 - stage * 2,
+            3,
+            2,
+            0.5,
+            0,
+            Math.PI * 2,
+          );
+          ctx.fill();
+        } else if (stage < 7) {
+          // Sapling — trunk + small canopy
+          var h = 12 + stage * 3;
+          ctx.strokeStyle = "#92400e";
+          ctx.lineWidth = 1.8;
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.quadraticCurveTo(x + sw * 0.4, y - h * 0.5, x + sw, y - h);
+          ctx.stroke();
+          var r = 5 + stage * 1.5;
+          var cg = ctx.createRadialGradient(x + sw, y - h, 0, x + sw, y - h, r);
+          cg.addColorStop(0, "rgba(34,197,94,0.55)");
+          cg.addColorStop(0.7, "rgba(22,163,74,0.3)");
+          cg.addColorStop(1, "rgba(22,163,74,0)");
+          ctx.fillStyle = cg;
+          ctx.beginPath();
+          ctx.arc(x + sw, y - h, r, 0, Math.PI * 2);
+          ctx.fill();
+        } else {
+          // Mature tree — thick trunk + branches + big canopy + fruit
+          var h = 25 + stage;
+          ctx.strokeStyle = "#78350f";
+          ctx.lineWidth = 2.5;
+          ctx.beginPath();
+          ctx.moveTo(x, y);
+          ctx.quadraticCurveTo(x + sw * 0.3, y - h * 0.55, x + sw, y - h);
+          ctx.stroke();
+          ctx.lineWidth = 1.2;
+          ctx.beginPath();
+          ctx.moveTo(x + sw * 0.4, y - h * 0.55);
+          ctx.lineTo(x + sw + 7, y - h - 4);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.moveTo(x + sw * 0.6, y - h * 0.7);
+          ctx.lineTo(x + sw - 6, y - h - 2);
+          ctx.stroke();
+          var r = 9 + stage;
+          ctx.shadowColor = "rgba(34,197,94,0.25)";
+          ctx.shadowBlur = 12;
+          var cg = ctx.createRadialGradient(x + sw, y - h, 0, x + sw, y - h, r);
+          cg.addColorStop(0, "rgba(34,197,94,0.5)");
+          cg.addColorStop(0.5, "rgba(22,163,74,0.3)");
+          cg.addColorStop(1, "rgba(22,163,74,0)");
+          ctx.fillStyle = cg;
+          ctx.beginPath();
+          ctx.arc(x + sw, y - h, r, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.shadowBlur = 0;
+          // Fruit on mature trees
+          if (stage >= 10) {
+            for (var f = 0; f < 4; f++) {
+              var a = f * 1.6 + t * 0.3;
+              ctx.fillStyle = "rgba(250,204,21,0.75)";
+              ctx.beginPath();
+              ctx.arc(
+                x + sw + Math.cos(a) * r * 0.45,
+                y - h + Math.sin(a) * r * 0.45,
+                1.8,
+                0,
+                Math.PI * 2,
+              );
+              ctx.fill();
             }
           }
         }
-        ctx.globalAlpha = 1;
+        // Label
+        ctx.font = "8px Inter";
+        ctx.fillStyle = stage >= 10 ? "#10b981" : "#6ee7b7";
+        ctx.fillText(stage >= 10 ? "-200kWh" : stage + "/10", x, y + 12);
+        ctx.restore();
+      }
+
+      function drawReactor(ctx, x, y, stage, t) {
+        ctx.save();
+        ctx.textAlign = "center";
+        if (stage < 5) {
+          // Construction scaffolding
+          ctx.strokeStyle = "rgba(239,68,68,0.5)";
+          ctx.lineWidth = 0.8;
+          for (var b = 0; b < 3; b++)
+            ctx.strokeRect(x - 6 + b * 5, y - 3 - stage * 2, 3, 3 + stage * 2);
+          ctx.fillStyle = "rgba(239,68,68,0.15)";
+          ctx.fillRect(x - 8, y - 4 - stage * 2, 16, 4 + stage * 2);
+        } else {
+          // Cooling tower silhouette
+          var pulse = Math.sin(t * 2.5) * 0.15;
+          ctx.fillStyle = "rgba(239,68,68," + (0.3 + pulse) + ")";
+          ctx.beginPath();
+          ctx.moveTo(x - 7, y);
+          ctx.quadraticCurveTo(x - 9, y - 14, x - 4, y - 26);
+          ctx.lineTo(x + 4, y - 26);
+          ctx.quadraticCurveTo(x + 9, y - 14, x + 7, y);
+          ctx.closePath();
+          ctx.fill();
+          ctx.shadowColor = "rgba(239,68,68,0.4)";
+          ctx.shadowBlur = 10;
+          ctx.strokeStyle = "rgba(239,68,68,0.5)";
+          ctx.lineWidth = 0.8;
+          ctx.stroke();
+          ctx.shadowBlur = 0;
+          // Core glow
+          ctx.fillStyle = "rgba(239,68,68," + (0.5 + pulse * 2) + ")";
+          ctx.beginPath();
+          ctx.arc(x, y - 16, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+          // Steam
+          for (var s = 0; s < 3; s++) {
+            var sy = y - 26 - s * 5 - (t % 3) * 4;
+            var sa = 0.15 - s * 0.04;
+            if (sa > 0) {
+              ctx.fillStyle = "rgba(200,200,200," + sa + ")";
+              ctx.beginPath();
+              ctx.arc(x + Math.sin(t + s) * 3, sy, 2 + s, 0, Math.PI * 2);
+              ctx.fill();
+            }
+          }
+        }
+        ctx.font = "8px Inter";
+        ctx.fillStyle = stage >= 10 ? "#ef4444" : "#fca5a5";
+        ctx.fillText(stage >= 10 ? "+5kW GPU" : stage + "/10", x, y + 12);
+        ctx.restore();
       }
 
       // LIVE prompt lifecycle tracker — COMPLETE journey with POAW + NI-Shield
