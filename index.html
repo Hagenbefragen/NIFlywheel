@@ -1843,7 +1843,13 @@
                 fp.x = -W / 2 - 30;
                 fp.y = (Math.random() - 0.5) * H * 0.3;
               } else {
-                // Normal completion: prompt exits and respawns
+                // Normal completion: prompt reaches the end, explode into nature if NI!
+                if (energyMode === "ni") {
+                  spawnTree(
+                    cx + fp.x * currentZoom + px * 0.3 + currentPanX,
+                    cy + fp.y * currentZoom + py * 0.3,
+                  );
+                }
                 fp.x = -W / 2 - 50;
                 fp.y = (Math.random() - 0.5) * H * 0.35;
                 fp._sirenReturn = false;
@@ -1854,7 +1860,16 @@
           var isBlk = fp.data.status === "block";
           if (isBlk && promptPhase === "shield" && fp.x > -W * 0.05) {
             fp.x = -W * 0.05;
-            fp._blocked = true;
+            if (!fp._blocked) {
+              fp._blocked = true;
+              // Thermoballing Animation (Re-using supernova explosion)
+              var bsx = cx + fp.x * currentZoom + px * 0.3 + currentPanX;
+              var bsy = cy + fp.y * currentZoom + py * 0.3;
+              supernovaFlash(bsx, bsy);
+              if (energyMode === "ni") {
+                spawnTree(bsx, bsy); // Drops leaves down into the Trust Tree
+              }
+            }
           }
 
           // trigger layer cascade — REAL data when available
