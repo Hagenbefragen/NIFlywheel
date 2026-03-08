@@ -593,46 +593,34 @@
         audioEnabled = true;
       });
 
-      function playSound(type) {
+      function playSolfeggio(freq, duration, type, vol) {
         if (!audioEnabled || audioCtx.state !== "running") return;
         var osc = audioCtx.createOscillator();
         var gainNode = audioCtx.createGain();
         osc.connect(gainNode);
-        gainNode.connect(audioCtx.destination);
+
+        // Add a bit of reverb/delay by using a lowpass filter
+        var filter = audioCtx.createBiquadFilter();
+        filter.type = "lowpass";
+        filter.frequency.value = freq * 2;
+        gainNode.connect(filter);
+        filter.connect(audioCtx.destination);
+
         var now = audioCtx.currentTime;
-        if (type === "ting") {
-          osc.type = "sine";
-          osc.frequency.setValueAtTime(1200, now);
-          osc.frequency.exponentialRampToValueAtTime(3200, now + 0.1);
-          gainNode.gain.setValueAtTime(0.04, now);
-          gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.3);
-          osc.start(now);
-          osc.stop(now + 0.3);
-        } else if (type === "thrum") {
-          osc.type = "sine";
-          osc.frequency.setValueAtTime(50, now);
-          osc.frequency.exponentialRampToValueAtTime(30, now + 0.6);
-          gainNode.gain.setValueAtTime(0.2, now);
-          gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
-          osc.start(now);
-          osc.stop(now + 0.6);
-        } else if (type === "zap") {
-          osc.type = "sawtooth";
-          osc.frequency.setValueAtTime(300, now);
-          osc.frequency.linearRampToValueAtTime(50, now + 0.1);
-          gainNode.gain.setValueAtTime(0.02, now);
-          gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.1);
-          osc.start(now);
-          osc.stop(now + 0.1);
-        } else if (type === "snip") {
-          osc.type = "square";
-          osc.frequency.setValueAtTime(1000, now);
-          osc.frequency.exponentialRampToValueAtTime(2500, now + 0.05);
-          gainNode.gain.setValueAtTime(0.03, now);
-          gainNode.gain.exponentialRampToValueAtTime(0.001, now + 0.05);
-          osc.start(now);
-          osc.stop(now + 0.05);
-        }
+        osc.type = type || "sine";
+        osc.frequency.setValueAtTime(freq, now);
+
+        // Soft Attack, Long Release (Crystal/Singing Bowl style envelope)
+        var maxVol = vol || 0.05;
+        gainNode.gain.setValueAtTime(0, now);
+        gainNode.gain.linearRampToValueAtTime(
+          maxVol,
+          now + Math.min(0.2, duration * 0.1),
+        );
+        gainNode.gain.exponentialRampToValueAtTime(0.001, now + duration);
+
+        osc.start(now);
+        osc.stop(now + duration + 0.1);
       }
 
       function resize() {
@@ -1118,6 +1106,7 @@
       // ═══ TREE GROWTH (Verified Prompt → Trust Tree) ═══
       var treeParticles = [];
       function spawnTree(x, y) {
+        playSolfeggio(285, 2.0, "sine", 0.05); // Healing Tissue
         // Trunk: particles fall downward
         for (var i = 0; i < 8; i++) {
           treeParticles.push({
@@ -1220,6 +1209,7 @@
       var myceliumPulses = [];
 
       function spawnGoldenSpiral(x, y) {
+        playSolfeggio(963, 2.0, "sine", 0.06); // Divine Consciousness
         goldenSpirals.push({
           x: x,
           y: y,
@@ -1230,7 +1220,7 @@
       }
 
       function spawnLightning(x1, y1, x2, y2) {
-        playSound("zap");
+        playSolfeggio(396, 0.8, "sawtooth", 0.02); // Liberating Fear
         lightningBolts.push({ x1: x1, y1: y1, x2: x2, y2: y2, life: 1.0 });
       }
 
@@ -1264,11 +1254,12 @@
       var crystals = [];
 
       function spawnSirenRipple(x, y) {
+        playSolfeggio(639, 1.5, "sine", 0.04); // Connecting
         sirenRipples.push({ x: x, y: y, life: 1.0, scale: 0 });
       }
 
       function spawnCrisprCut(x, y) {
-        playSound("snip");
+        playSolfeggio(417, 0.5, "square", 0.02); // Wiping out negativity
         crisprCuts.push({ x: x, y: y, life: 1.0, rot: 0 });
         for (var i = 0; i < 6; i++) {
           crisprLetters.push({
@@ -1283,7 +1274,7 @@
       }
 
       function spawnCrystal(x, y) {
-        playSound("ting");
+        playSolfeggio(852, 1.5, "sine", 0.04); // Spiritual Order
         crystals.push({
           x: x,
           y: y,
@@ -1310,7 +1301,7 @@
       }
 
       function spawnEventHorizon(x, y) {
-        playSound("thrum");
+        playSolfeggio(174, 2.0, "sine", 0.06); // Grounding
         eventHorizons.push({ x: x, y: y, life: 1.0, radius: 0 });
       }
 
@@ -1330,10 +1321,12 @@
       var magneticFields = [];
 
       function spawnPrism(x, y) {
+        playSolfeggio(741, 1.2, "sine", 0.04); // Awakening Intuition
         prisms.push({ x: x, y: y, life: 1.0, scale: 0 });
       }
 
       function spawnDNA(x, y) {
+        playSolfeggio(528, 2.0, "sine", 0.05); // Repairing DNA
         dnaStrands.push({ x: x, y: y, life: 1.0, phase: 0 });
       }
 
