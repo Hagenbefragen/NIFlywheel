@@ -45,7 +45,144 @@ var KD_GROUPS = {
 // ALL 77 LAYERS — wired=true means imported in aegis.service.ts or cascade-coordinator.ts
 // phase: shield | compress | audit
 // group: key from KD_GROUPS
-// pos: [ring, angle] for radial layout within phase zone
+// role: blocker | flagger | advisor | orchestrator | sentinel | infra (from SSOT audit)
+
+// ═══ ROLE MAP — from ni_stack_agent_architecture_audit.md SSOT ═══
+var AGENT_ROLES = {
+  // Role symbols for display
+  blocker: {
+    name: "Execution Blocker",
+    symbol: "\ud83d\udeab",
+    color: "#ef4444",
+  },
+  flagger: {
+    name: "Execution Flagger",
+    symbol: "\ud83d\udea9",
+    color: "#f59e0b",
+  },
+  advisor: { name: "Advisor", symbol: "\ud83e\udde0", color: "#3b82f6" },
+  orchestrator: {
+    name: "Orchestrator",
+    symbol: "\ud83c\udfbc",
+    color: "#a855f7",
+  },
+  sentinel: {
+    name: "Sentinel",
+    symbol: "\ud83d\udc41\ufe0f",
+    color: "#10b981",
+  },
+  infra: { name: "Infrastructure", symbol: "\u2699\ufe0f", color: "#64748b" },
+};
+var ROLE_MAP = {
+  // AEGIS Stage 0
+  cri: "blocker",
+  pmb: "infra",
+  aetl: "infra",
+  pds: "blocker",
+  // Stage 1
+  ics: "blocker",
+  keyword: "flagger",
+  imperative: "flagger",
+  // Stage 3: Dissolution D-1..D-17
+  d1_hid: "blocker",
+  d4_cred: "blocker",
+  d5_fiction: "blocker",
+  d6_meta: "flagger",
+  d7_urgency: "flagger",
+  d8_social: "flagger",
+  d9_bridge: "flagger",
+  d10_echo: "flagger",
+  d11_persona: "flagger",
+  d12_ubn: "blocker",
+  d13_set: "blocker",
+  d14_cpd: "blocker",
+  d15_fwg: "blocker",
+  d16_lpd: "blocker",
+  d17_laps: "blocker",
+  // Kaiostic Cascade
+  d33_egc: "blocker",
+  d34_kie: "blocker",
+  d35_lyap: "blocker",
+  // WAVES / SIREN Universal Defense
+  d37_tdd: "blocker",
+  d38_eti: "blocker",
+  d39_ked: "blocker",
+  d3a_bdc: "orchestrator",
+  // Twain Syntactic Shield
+  d41_sam: "blocker",
+  d42_spi: "blocker",
+  d43_cwf: "blocker",
+  // Support Agents
+  msf: "flagger",
+  d24_locard: "flagger",
+  d12_advsuffix: "blocker",
+  d33_pair: "flagger",
+  d4_kaid: "blocker",
+  d32_crescendo: "flagger",
+  d7_seismic: "flagger",
+  d36_academic: "flagger",
+  d20_crispr: "blocker",
+  // Game Theory Coordinators
+  thermoballing: "orchestrator",
+  fpr: "advisor",
+  axelrod: "advisor",
+  aumann: "orchestrator",
+  blotto: "orchestrator",
+  bayesian: "orchestrator",
+  lotka: "advisor",
+  trembling: "flagger",
+  cfar: "advisor",
+  five_sigma: "advisor",
+  mycorrhizal: "infra",
+  mycelium: "infra",
+  tbg: "orchestrator",
+  // V2 Cascade
+  v2_l0: "blocker",
+  v2_l1: "blocker",
+  v2_l2: "blocker",
+  v2_l3: "blocker",
+  v2_l4: "blocker",
+  v2_l5: "blocker",
+  v2_l6: "blocker",
+  v2_l7: "blocker",
+  // PQC
+  merkle_acc: "infra",
+  merkle_seal: "infra",
+  // QFAI-C Compression
+  qfai_zeck: "infra",
+  qfai_steno: "infra",
+  qfai_phi: "orchestrator",
+  qfai_distill: "blocker",
+  qfai_entropy: "flagger",
+  qfai_recon: "infra",
+  qfai_wormhole: "blocker",
+  // SIREN Audit
+  siren_genome: "sentinel",
+  siren_rav: "sentinel",
+  siren_qiat: "sentinel",
+  siren_drift: "sentinel",
+  siren_negentropy: "sentinel",
+  siren_avr: "sentinel",
+  siren_feedback: "orchestrator",
+  heart: "advisor",
+  // Dead/Planned
+  dead_anticipatory: "advisor",
+  dead_code_exec: "blocker",
+  dead_composite: "orchestrator",
+  dead_gricean: "blocker",
+  dead_harmonic: "blocker",
+  dead_holographic: "blocker",
+  dead_honest: "advisor",
+  dead_meta: "flagger",
+  dead_storm: "blocker",
+  dead_structural: "flagger",
+  dead_tele_traj: "blocker",
+  dead_turbulence: "blocker",
+  dead_ultrasonic: "blocker",
+  dead_rag: "blocker",
+  dead_jurisdiction: "flagger",
+};
+
 var ALL_LAYERS = [
   // ═══ PHASE 1: SHIELD — Stage 0 (Pre-filter) ═══
   {
@@ -1130,4 +1267,11 @@ var GROUP_COUNTS = {};
 ALL_LAYERS.forEach(function (l) {
   if (!GROUP_COUNTS[l.group]) GROUP_COUNTS[l.group] = 0;
   GROUP_COUNTS[l.group]++;
+  // Auto-assign role from SSOT ROLE_MAP
+  l.role = ROLE_MAP[l.id] || "blocker";
+});
+var ROLE_COUNTS = {};
+ALL_LAYERS.forEach(function (l) {
+  if (!ROLE_COUNTS[l.role]) ROLE_COUNTS[l.role] = 0;
+  ROLE_COUNTS[l.role]++;
 });

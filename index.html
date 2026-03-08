@@ -564,7 +564,7 @@
               Object.keys(colCounts).forEach(function (k) {
                 if (colCounts[k] > maxRows) maxRows = colCounts[k];
               });
-              l._tRelY = (l._row - maxRows / 2) * rowHeight;
+              l._tRelY = (l._row - maxRows / 2) * rowHeight + 60;
               l._tPcx = 0; // Center on screen (no phase offset)
             });
           } else {
@@ -1232,8 +1232,17 @@
             : act.active
             ? "#10b981"
             : "#64748b";
-          ip.querySelector(".claim").textContent = "📜 " + L.claim;
-          ip.querySelector(".file").textContent = "📁 " + L.file;
+          // Show role from SSOT
+          var roleInfo = AGENT_ROLES[L.role] || AGENT_ROLES.blocker;
+          var roleEl = ip.querySelector(".claim");
+          roleEl.textContent =
+            roleInfo.symbol +
+            " " +
+            roleInfo.name +
+            " \u00b7 \ud83d\udcdc " +
+            L.claim;
+          roleEl.style.color = roleInfo.color;
+          ip.querySelector(".file").textContent = "\ud83d\udcc1 " + L.file;
           ip.classList.add("visible");
           pp.classList.remove("visible");
         } else if (selectedPrompt !== null) {
@@ -1380,12 +1389,12 @@
         ctx.fillStyle = "#7c3aed";
         ctx.fillText("🐬 AUDIT", cx + W * 0.3, headerY);
         // Flow arrows between headers
-        ctx.globalAlpha = 0.2;
-        ctx.font = "16px serif";
-        ctx.fillStyle = "#64748b";
-        ctx.fillText("→", cx - W * 0.05, headerY);
-        ctx.fillText("→", cx + W * 0.14, headerY);
-        ctx.fillText("→", cx + W * 0.24, headerY);
+        ctx.globalAlpha = 0.6;
+        ctx.font = "bold 24px serif";
+        ctx.fillStyle = "#94a3b8";
+        ctx.fillText("⟶", cx - W * 0.05, headerY);
+        ctx.fillText("⟶", cx + W * 0.14, headerY);
+        ctx.fillText("⟶", cx + W * 0.24, headerY);
         ctx.globalAlpha = 1;
         // Mycelium connections (within same group) AND Pipeline connections
         ALL_LAYERS.forEach(function (a, ai) {
@@ -1415,15 +1424,25 @@
 
               if ((drawMycelium && dist < 150) || drawPipeline) {
                 var vis = activePhase === "all" || activePhase === a.phase;
+                // Highlight connections to/from selected agent
+                var connectedToSelected =
+                  selectedLayer &&
+                  (a.id === selectedLayer || b.id === selectedLayer);
 
-                if (drawPipeline) {
-                  // Pipeline links get a specific techy style
+                if (connectedToSelected) {
+                  // Bright connection to selected agent
+                  ctx.strokeStyle = g ? g.color : "rgba(45, 212, 191, 0.6)";
+                  ctx.globalAlpha = 0.7;
+                  ctx.lineWidth = 1.8;
+                  ctx.setLineDash([]);
+                } else if (drawPipeline) {
+                  // Pipeline links
                   ctx.strokeStyle =
                     "rgba(45, 212, 191, " +
                     (a._alpha > 0.5 || b._alpha > 0.5 ? 0.15 : 0.03) +
                     ")";
                   ctx.lineWidth = 0.5;
-                  ctx.setLineDash([2, 4]); // Dashed flow
+                  ctx.setLineDash([2, 4]);
                 } else {
                   // Standard Mycelium
                   ctx.strokeStyle =
@@ -1437,6 +1456,7 @@
                 ctx.lineTo(pb.x, pb.y);
                 ctx.stroke();
                 ctx.setLineDash([]);
+                ctx.globalAlpha = 1;
               }
             }
           }
@@ -1448,13 +1468,29 @@
           var isSelected = selectedLayer === l.id;
           var phaseVis = activePhase === "all" || activePhase === l.phase;
           var g = KD_GROUPS[l.group];
-          // Alpha: dead=0.15, inactive wired=0.10+phase, active=full
+          // Alpha: dead=0.12, inactive depends on test + selection, active=full
           var alpha;
+          var selectedLayerObj = selectedLayer
+            ? ALL_LAYERS.find(function (x) {
+                return x.id === selectedLayer;
+              })
+            : null;
           if (!phaseVis) alpha = 0.02;
-          else if (!l.wired) alpha = 0.15; // Dead: 15-20% — visible but ghostly
           else if (isSelected) alpha = 1;
+          else if (selectedLayerObj) {
+            // Another agent is selected — highlight related agents
+            var sameGroup =
+              l.group === selectedLayerObj.group && l.group !== "dead";
+            var sameRole = l.role === selectedLayerObj.role;
+            if (sameGroup && sameRole)
+              alpha = 0.65; // Both match: brightest relatives
+            else if (sameGroup) alpha = 0.5; // Same Knowledge Domain: 50%
+            else if (sameRole) alpha = 0.5; // Same Role: 50%
+            else if (act.active) alpha = 0.15;
+            else alpha = 0.03; // Dim everything else
+          } else if (!l.wired) alpha = 0.12; // Planned: ghostly
           else if (act.active) alpha = 0.3 + act.intensity * 0.7;
-          else alpha = 0.1;
+          else alpha = testRunning ? 0.1 : 0.05; // Dormant when no prompts flowing
           var r =
             (11 + (isSelected ? 5 : 0) + (act.active ? act.intensity * 3 : 0)) *
             Math.max(0.5, currentZoom * 0.9);
