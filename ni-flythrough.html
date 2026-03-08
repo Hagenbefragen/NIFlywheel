@@ -598,7 +598,31 @@
       </div>
     </div>
     <div id="info-panel">
-      <div class="domain"></div>
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+        "
+      >
+        <div class="domain"></div>
+        <button
+          onclick="selectedLayer=null;selectedPrompt=null;updatePanels();"
+          style="
+            background: none;
+            border: none;
+            color: #94a3b8;
+            font-size: 16px;
+            cursor: pointer;
+            padding: 2px 6px;
+            border-radius: 4px;
+          "
+          onmouseover="this.style.color='#ef4444'"
+          onmouseout="this.style.color='#94a3b8'"
+        >
+          ✕
+        </button>
+      </div>
       <h3></h3>
       <div class="badge"></div>
       <p></p>
@@ -2426,11 +2450,11 @@
               (ROLE_MAP[l.id] || "blocker") ===
               (ROLE_MAP[selectedLayerObj.id] || "blocker");
             if (sameGroup && sameRole)
-              alpha = 0.65; // Both match: brightest relatives
-            else if (sameGroup) alpha = 0.5; // Same Knowledge Domain: 50%
-            else if (sameRole) alpha = 0.5; // Same Role: 50%
-            else if (act.active) alpha = 0.15;
-            else alpha = 0.03; // Dim everything else
+              alpha = 0.7; // Both match: brightest relatives
+            else if (sameGroup) alpha = 0.55; // Same Knowledge Domain
+            else if (sameRole) alpha = 0.45; // Same Role
+            else if (act.active) alpha = 0.25; // Active but unrelated
+            else alpha = 0.15; // 🚨 Keep visible! Was 0.03 = invisible
           } else if (!l.wired) alpha = 0.12; // Planned: ghostly
           else if (act.active) alpha = 0.3 + act.intensity * 0.7;
           else alpha = testRunning ? 0.1 : 0.05; // Dormant when no prompts flowing
