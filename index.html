@@ -493,6 +493,8 @@
         currentZoom = 1.0;
       var targetPanX = 0,
         currentPanX = 0;
+      var targetPanY = 0,
+        currentPanY = 0;
 
       // Position layers: dynamic layout supporting rings and matrix pipelines
       function updateLayoutTargets() {
@@ -548,18 +550,22 @@
             });
 
             layers.forEach(function (l) {
-              var totalCols = 15;
-              var colW = (W * 1.8) / totalCols; // Stretched width to fill screen
-              var startX = -(totalCols * colW) / 2 + colW; // Center matrix
+              var totalCols = Object.keys(colCounts).length || 15;
+              var usableW = W * 0.92; // Use 92% of screen width
+              var colW = usableW / totalCols;
+              var startX = -usableW / 2 + colW / 2; // Center the grid
 
-              l._tRelX = (startX + l._col * colW) / 1.35; // account for zoom reduction
-              var rowHeight = Math.max(40, 50 * vScale);
+              l._tRelX = startX + l._col * colW;
+              var rowHeight = Math.max(36, 44 * vScale);
 
-              // Rigid Nagel-Brett: do NOT center vertically per column.
-              // Instead, align them all uniformly from the top (offset by roughly 3 rows to center the whole block).
-              // This prevents the "diamond" or "curved circle" optical illusion.
-              l._tRelY = (l._row - 3.5) * rowHeight;
-              l._tPcx = 0; // Absolute center
+              // Rigid Nagel-Brett: top-aligned uniform grid.
+              // All columns start from the same top offset.
+              var maxRows = 0;
+              Object.keys(colCounts).forEach(function (k) {
+                if (colCounts[k] > maxRows) maxRows = colCounts[k];
+              });
+              l._tRelY = (l._row - maxRows / 2) * rowHeight;
+              l._tPcx = 0; // Center on screen (no phase offset)
             });
           } else {
             // Classic Radial Layout
@@ -592,9 +598,9 @@
 
       function getLayerScreenPos(l, cx, cy, px, py) {
         // Continuous morphing interpolation
-        l._currPcx += (l._tPcx - l._currPcx) * 0.05;
-        l._relX += (l._tRelX - l._relX) * 0.05;
-        l._relY += (l._tRelY - l._relY) * 0.05;
+        l._currPcx += (l._tPcx - l._currPcx) * 0.15;
+        l._relX += (l._tRelX - l._relX) * 0.15;
+        l._relY += (l._tRelY - l._relY) * 0.15;
 
         var ox = cx + l._currPcx * W * currentZoom + px * 0.3 + currentPanX;
         var oy = cy + py * 0.3;
