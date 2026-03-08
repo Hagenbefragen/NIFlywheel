@@ -1190,6 +1190,37 @@
         });
       }
 
+      var quantumPairs = [];
+      var eventHorizons = [];
+      var butterflies = [];
+
+      function spawnQuantumEntanglement(x, y) {
+        var ang = Math.random() * Math.PI * 2;
+        var dist = 30 + Math.random() * 50;
+        quantumPairs.push({
+          x1: x + Math.cos(ang) * dist,
+          y1: y + Math.sin(ang) * dist,
+          x2: x - Math.cos(ang) * dist,
+          y2: y - Math.sin(ang) * dist,
+          life: 1.0,
+        });
+      }
+
+      function spawnEventHorizon(x, y) {
+        eventHorizons.push({ x: x, y: y, life: 1.0, radius: 0 });
+      }
+
+      function spawnButterfly(x, y) {
+        butterflies.push({
+          x: x,
+          y: y,
+          life: 1.0,
+          flap: 0,
+          vx: (Math.random() - 0.5) * 2,
+          vy: -1 - Math.random() * 2,
+        });
+      }
+
       function drawScientificAnimations(ctx) {
         // 1. Mycelium Pulses
         for (var i = myceliumPulses.length - 1; i >= 0; i--) {
@@ -1349,6 +1380,99 @@
           }
           ctx.stroke();
           ctx.restore();
+        }
+
+        // 7. Quantum Entanglement
+        for (var i = quantumPairs.length - 1; i >= 0; i--) {
+          var qp = quantumPairs[i];
+          qp.life -= 0.02;
+          if (qp.life <= 0) {
+            quantumPairs.splice(i, 1);
+            continue;
+          }
+          ctx.globalAlpha = qp.life;
+          var t = 1.0 - qp.life;
+          ctx.strokeStyle = "rgba(16, 185, 129, " + qp.life + ")"; // Green QFAI
+          ctx.lineWidth = 1;
+          ctx.setLineDash([5, 5]);
+          ctx.beginPath();
+          ctx.moveTo(qp.x1, qp.y1);
+          ctx.lineTo(qp.x2, qp.y2);
+          ctx.stroke();
+          ctx.setLineDash([]);
+
+          ctx.fillStyle = "#34d399";
+          ctx.beginPath();
+          ctx.arc(qp.x1, qp.y1, 2 + t * 3, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(qp.x2, qp.y2, 2 + t * 3, 0, Math.PI * 2);
+          ctx.fill();
+        }
+
+        // 8. Event Horizon
+        for (var i = eventHorizons.length - 1; i >= 0; i--) {
+          var eh = eventHorizons[i];
+          eh.life -= 0.015;
+          eh.radius += (60 - eh.radius) * 0.1;
+          if (eh.life <= 0) {
+            eventHorizons.splice(i, 1);
+            continue;
+          }
+          ctx.globalAlpha = eh.life * 0.9;
+
+          var grd = ctx.createRadialGradient(
+            eh.x,
+            eh.y,
+            0,
+            eh.x,
+            eh.y,
+            eh.radius,
+          );
+          grd.addColorStop(0, "rgba(0,0,0,1)");
+          grd.addColorStop(0.5, "rgba(251,191,36,0.3)"); // LLM Gold color
+          grd.addColorStop(1, "rgba(0,0,0,0)");
+          ctx.fillStyle = grd;
+          ctx.beginPath();
+          ctx.arc(eh.x, eh.y, eh.radius, 0, Math.PI * 2);
+          ctx.fill();
+
+          ctx.strokeStyle = "rgba(251,191,36, " + eh.life + ")";
+          ctx.beginPath();
+          ctx.arc(eh.x, eh.y, eh.radius * 0.5, 0, Math.PI * 2);
+          ctx.stroke();
+        }
+
+        // 9. Butterfly Effect
+        for (var i = butterflies.length - 1; i >= 0; i--) {
+          var bf = butterflies[i];
+          bf.life -= 0.005;
+          bf.flap += 0.5;
+          bf.x += bf.vx;
+          bf.y += bf.vy;
+          if (bf.life <= 0) {
+            butterflies.splice(i, 1);
+            continue;
+          }
+          ctx.globalAlpha = bf.life;
+          ctx.font = "24px Arial";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.save();
+          ctx.translate(bf.x, bf.y);
+          ctx.scale(Math.abs(Math.sin(bf.flap)), 1); // Flapping effect
+          ctx.fillText("🦋", 0, 0);
+          ctx.restore();
+
+          // Wind gust ripple across entire screen based on life
+          if (bf.life > 0.8) {
+            var r = (1.0 - bf.life) * 4000;
+            ctx.strokeStyle = "rgba(255, 255, 255, " + (bf.life - 0.8) + ")";
+            ctx.lineWidth = 2;
+            ctx.beginPath();
+            ctx.arc(bf.x, bf.y, r, 0, Math.PI * 2);
+            ctx.stroke();
+          }
         }
 
         ctx.shadowBlur = 0;
@@ -2013,6 +2137,54 @@
           );
         }
 
+        var LAYER_TO_AGENT = {
+          "cri-kleinhirn": "cri",
+          "pmb-memory-bank": "pmb",
+          "pds-frame-stripper": "pds",
+          "ics-v8": "ics",
+          keyword: "fsa",
+          imperative: "fsa",
+          "D1-HID": "hid",
+          "D4-Credential": "cred",
+          "D5-FictionHarm": "fh",
+          "D6-MetaLearn": "meta",
+          "D7-Urgency": "urgency",
+          "D8-SocialProof": "social",
+          "D9-EscBridge": "bridge",
+          "D10-EchoSeg": "echo",
+          "D11-PersonaShield": "persona",
+          "D12-UBN": "ubn",
+          "D13-SET": "set_layer",
+          "D14-CPD": "cpd",
+          "D15-FWG": "fwg",
+          "D16-LPD": "lpd",
+          "D17-LAPS": "laps",
+          "D18-ANTICIPATORY": "anticipatory",
+          "D19-GMA": "gma",
+          "D20-SOD": "dead_structural",
+          "D21-TTA": "tta",
+          "D22-KAID": "kaid",
+          "D23-HCG": "hcg",
+          "D24-HSD": "hsd",
+          "D25-HOLOGRAPHIC": "holographic",
+          "D26-STORM": "dead_storm",
+          "D27-TURB": "dead_turb",
+          "D30-CODE_EXEC": "code_exec",
+          "D31-META_INJECT": "meta_inject",
+          "D30b-UVID": "uvid",
+          "D33-EGC": "egc",
+          "D34-KIE": "kie",
+          "D35-LYAP": "lyap",
+          "D37-TDD": "tdd",
+          "D38-ETI": "eti",
+          "D39-KED": "ked",
+          "D3A-BDC": "bdc",
+          "D41-ANCHOR": "twain_anchor",
+          "D42-PAYLOAD": "twain_payload",
+          "D43-FRACTURE": "twain_fracture",
+          "D50-COMPOSITE": "composite",
+        };
+
         for (var fi = 0; fi < flowingPrompts.length; fi++) {
           var fp = flowingPrompts[fi];
           // Determine prompt's current phase based purely on its logical non-zoomed x
@@ -2117,6 +2289,11 @@
               cx + fp.x * currentZoom + px * 0.3 + currentPanX,
               cy + fp.y * currentZoom + py * 0.3,
             );
+            // 7. Quantum Entanglement
+            spawnQuantumEntanglement(
+              cx + fp.x * currentZoom + px * 0.3 + currentPanX,
+              cy + fp.y * currentZoom + py * 0.3,
+            );
           }
           if (
             fp._lastPhase === "compress" &&
@@ -2125,6 +2302,11 @@
           ) {
             // 6. Harmonic Crystal on entering audit (alignment)
             spawnCrystal(
+              cx + fp.x * currentZoom + px * 0.3 + currentPanX,
+              cy + fp.y * currentZoom + py * 0.3,
+            );
+            // 8. Event Horizon! (Happens when it enters LLM Box right before Audit)
+            spawnEventHorizon(
               cx + fp.x * currentZoom + px * 0.3 + currentPanX,
               cy + fp.y * currentZoom + py * 0.3,
             );
@@ -2149,6 +2331,23 @@
                 // 1. Golden Spiral (if 2+ agents flag, Thermoballing)
                 if (fp._flaggedAgents.length >= 2) {
                   spawnGoldenSpiral(bsx, bsy);
+                }
+
+                // 9. Butterfly Effect (Chaos Cascade from behavioral nodes)
+                var triggersButterfly = fp._flaggedAgents.some(function (
+                  agentId,
+                ) {
+                  var mappedId = LAYER_TO_AGENT
+                    ? LAYER_TO_AGENT[agentId] || agentId
+                    : agentId;
+                  return (
+                    mappedId === "meta" ||
+                    mappedId === "ubn" ||
+                    mappedId === "persona"
+                  );
+                });
+                if (triggersButterfly) {
+                  spawnButterfly(bsx, bsy);
                 }
 
                 // Trigger Mycelium Pulses and Bayesian Lightning from each flagging agent
