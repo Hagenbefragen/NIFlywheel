@@ -1030,24 +1030,60 @@
       try {
         window._niPromptBridge = new BroadcastChannel("ni-prompt-bridge");
         window._niPromptBridge.onmessage = function (e) {
-          if (e.data && e.data.type === "inject_prompt" && !testRunning) {
-            // Received real prompt from analytical dashboard — inject into flythrough
-            var scenario = SCENARIOS[activeScenario] || SCENARIOS.mixed;
+          if (e.data && e.data.type === "inject_prompt") {
+            // Real prompt from analytical dashboard with full AEGIS layer data
+            testRunning = true; // Auto-start visualization
+            var rd = e.data;
+            // Map real layer names to flythrough agent IDs
+            var realLayers = (rd.layers || []).map(function (l) {
+              return {
+                layer: l.layer,
+                score: l.score,
+                flagged: l.flagged,
+                reason: l.reason || "",
+              };
+            });
+            // Find which agents this prompt visited and which flagged
+            var flaggedAgents = realLayers
+              .filter(function (l) {
+                return l.flagged;
+              })
+              .map(function (l) {
+                return l.layer;
+              });
+            var visitedAgents = realLayers.map(function (l) {
+              return l.layer;
+            });
+
             flowingPrompts.push({
               x: -W / 2 - 50,
               y: (Math.random() - 0.5) * H * 0.35,
               speed: 1.2 + Math.random() * 0.8,
               size: 4 + Math.random() * 3,
               data: {
-                original: e.data.prompt || "Real prompt",
-                status: e.data.status || "pass",
+                original: rd.prompt || "Real prompt",
+                status: rd.status || "pass",
+                category: rd.category || "benign",
+                decision: rd.decision || "PASS",
+                icsZone: rd.icsZone || null,
+                icsScore: rd.icsScore || null,
+                sirenDrift: rd.sirenDrift || null,
               },
+              _realLayers: realLayers,
+              _flaggedAgents: flaggedAgents,
+              _visitedAgents: visitedAgents,
+              _killedBy: rd.killedBy || null,
+              _isAdversarial: rd.isAdversarial || false,
               _blocked: false,
               _blockTimer: 0,
               _phase: "shield",
               _sirenReturn: false,
               _supernovaFired: false,
+              _cascadeIdx: 0, // Current position in real cascade
+              _lastAgentHit: null,
             });
+            // Cap at 15 on screen
+            if (flowingPrompts.length > 15) flowingPrompts.shift();
           }
         };
       } catch (ex) {
@@ -1682,9 +1718,16 @@
           // Attack prompts that somehow pass also get flagged and sent back
           if (fp.x > W * 0.42) {
             if (!fp._blocked) {
-              if (Math.random() < 0.15 && !fp._sirenReturn) {
+              // Use real SIREN data if available, otherwise random chance
+              var shouldSirenReturn =
+                fp.data.sirenDrift === "DRIFTING" ||
+                fp.data.sirenDrift === "CRITICAL_DRIFT";
+              if (!shouldSirenReturn && !fp.data.sirenDrift)
+                shouldSirenReturn = Math.random() < 0.15;
+              if (shouldSirenReturn && !fp._sirenReturn) {
                 // SIREN feedback: send back to AEGIS for re-scan (purple flash)
                 fp._sirenReturn = true;
+                fp._cascadeIdx = 0; // Reset cascade for re-scan
                 fp.x = -W / 2 - 30;
                 fp.y = (Math.random() - 0.5) * H * 0.3;
               } else {
@@ -1707,18 +1750,92 @@
             fp._blocked = true;
           }
 
-          // trigger layer cascade
+          // trigger layer cascade — REAL data when available
           if (!fp._blocked && fp.x > -W / 2 && fp.x < W / 2) {
-            var phaseLayers = ALL_LAYERS.filter(function (l) {
-              return l.phase === promptPhase && l.wired;
-            });
-            if (phaseLayers.length > 0 && Math.random() < 0.03) {
-              var pick =
-                phaseLayers[Math.floor(Math.random() * phaseLayers.length)];
-              var la = layerActivity[pick.id];
-              la.active = true;
-              la.intensity = 1.0;
-              la.lastTrigger = Date.now();
+            if (fp._realLayers && fp._realLayers.length > 0) {
+              // ═══ REAL CASCADE: Light up actual agents from AEGIS results ═══
+              // Map layer names to flythrough agent IDs
+              var LAYER_TO_AGENT = {
+                "cri-kleinhirn": "cri",
+                "pmb-memory-bank": "pmb",
+                "pds-frame-stripper": "pds",
+                "ics-v8": "ics",
+                keyword: "fsa",
+                imperative: "fsa",
+                "D1-HID": "hid",
+                "D4-Credential": "cred",
+                "D5-FictionHarm": "fh",
+                "D6-MetaLearn": "meta",
+                "D7-Urgency": "urgency",
+                "D8-SocialProof": "social",
+                "D9-EscBridge": "bridge",
+                "D10-EchoSeg": "echo",
+                "D11-PersonaShield": "persona",
+                "D12-UBN": "ubn",
+                "D13-SET": "set_layer",
+                "D14-CPD": "cpd",
+                "D15-FWG": "fwg",
+                "D16-LPD": "lpd",
+                "D17-LAPS": "laps",
+                "D18-ANTICIPATORY": "anticipatory",
+                "D19-GMA": "gma",
+                "D20-SOD": "dead_structural",
+                "D21-TTA": "tta",
+                "D22-KAID": "kaid",
+                "D23-HCG": "hcg",
+                "D24-HSD": "hsd",
+                "D25-HOLOGRAPHIC": "holographic",
+                "D26-STORM": "dead_storm",
+                "D27-TURB": "dead_turb",
+                "D30-CODE_EXEC": "code_exec",
+                "D31-META_INJECT": "meta_inject",
+                "D30b-UVID": "uvid",
+                "D33-EGC": "egc",
+                "D34-KIE": "kie",
+                "D35-LYAP": "lyap",
+                "D37-TDD": "tdd",
+                "D38-ETI": "eti",
+                "D39-KED": "ked",
+                "D3A-BDC": "bdc",
+                "D41-ANCHOR": "twain_anchor",
+                "D42-PAYLOAD": "twain_payload",
+                "D43-FRACTURE": "twain_fracture",
+                "D50-COMPOSITE": "composite",
+              };
+              // Progress through cascade based on x position
+              var cascadeProgress = Math.min(1, (fp.x + W * 0.3) / (W * 0.5));
+              var layersToShow = Math.floor(
+                cascadeProgress * fp._realLayers.length,
+              );
+              for (
+                var li = fp._cascadeIdx;
+                li < layersToShow && li < fp._realLayers.length;
+                li++
+              ) {
+                var rl = fp._realLayers[li];
+                var agentId = LAYER_TO_AGENT[rl.layer];
+                if (agentId && layerActivity[agentId]) {
+                  var la = layerActivity[agentId];
+                  la.active = true;
+                  la.intensity = rl.flagged ? 1.0 : 0.6;
+                  la.lastTrigger = Date.now();
+                  fp._lastAgentHit = agentId;
+                }
+              }
+              fp._cascadeIdx = layersToShow;
+            } else {
+              // Fallback: random cascade (no real data available)
+              var phaseLayers = ALL_LAYERS.filter(function (l) {
+                return l.phase === promptPhase && l.wired;
+              });
+              if (phaseLayers.length > 0 && Math.random() < 0.03) {
+                var pick =
+                  phaseLayers[Math.floor(Math.random() * phaseLayers.length)];
+                var la = layerActivity[pick.id];
+                la.active = true;
+                la.intensity = 1.0;
+                la.lastTrigger = Date.now();
+              }
             }
           }
 
