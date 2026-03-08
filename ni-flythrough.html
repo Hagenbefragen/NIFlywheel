@@ -296,6 +296,58 @@
         background: rgba(255, 255, 255, 0.04);
         color: #e2e8f0;
       }
+      #legend .item .legend-tip {
+        display: none;
+        position: absolute;
+        left: 100%;
+        top: 50%;
+        transform: translateY(-50%);
+        margin-left: 8px;
+        background: rgba(8, 14, 32, 0.95);
+        backdrop-filter: blur(16px);
+        -webkit-backdrop-filter: blur(16px);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        border-radius: 8px;
+        padding: 10px 14px;
+        min-width: 240px;
+        max-width: 320px;
+        z-index: 9999;
+        box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+        pointer-events: none;
+      }
+      #legend .item:hover .legend-tip {
+        display: block;
+      }
+      #legend .item {
+        position: relative;
+      }
+      .legend-tip .tip-name {
+        font-size: 0.65rem;
+        font-weight: 700;
+        color: #f0f4f8;
+        margin-bottom: 3px;
+      }
+      .legend-tip .tip-role {
+        font-size: 0.5rem;
+        font-weight: 600;
+        margin-bottom: 4px;
+      }
+      .legend-tip .tip-desc {
+        font-size: 0.5rem;
+        color: #94a3b8;
+        line-height: 1.4;
+        margin-bottom: 4px;
+        white-space: normal;
+      }
+      .legend-tip .tip-claim {
+        font-size: 0.45rem;
+        color: #64748b;
+      }
+      .legend-tip .tip-file {
+        font-size: 0.42rem;
+        color: #475569;
+        font-family: monospace;
+      }
       #legend .item.active {
         color: #f0f4f8;
         background: rgba(45, 212, 191, 0.08);
@@ -1935,6 +1987,7 @@
           deadTag +
           "</div>";
         gLayers.forEach(function (l) {
+          var roleInfo = AGENT_ROLES[ROLE_MAP[l.id]] || AGENT_ROLES.blocker;
           legendContent.innerHTML +=
             '<div class="item" data-id="' +
             l.id +
@@ -1945,6 +1998,29 @@
             l.emoji +
             " " +
             l.name +
+            '<div class="legend-tip">' +
+            '<div class="tip-name">' +
+            l.emoji +
+            " " +
+            l.name +
+            "</div>" +
+            '<div class="tip-role" style="color:' +
+            roleInfo.color +
+            '">' +
+            roleInfo.symbol +
+            " " +
+            roleInfo.name +
+            "</div>" +
+            '<div class="tip-desc">' +
+            (l.desc || "No description") +
+            "</div>" +
+            '<div class="tip-claim">📜 ' +
+            (l.claim || "N/A") +
+            "</div>" +
+            '<div class="tip-file">📁 ' +
+            (l.file || "N/A") +
+            "</div>" +
+            "</div>" +
             "</div>";
         });
       });
