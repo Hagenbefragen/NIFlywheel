@@ -413,6 +413,72 @@
       </select>
       <button id="run-btn" onclick="toggleTest()">▶ RUN</button>
     </div>
+    <div
+      id="energy-mode-toggle"
+      style="
+        position: fixed;
+        top: 70px;
+        right: 12px;
+        z-index: 20;
+        background: rgba(10, 15, 30, 0.85);
+        border: 1px solid rgba(45, 212, 191, 0.2);
+        padding: 10px;
+        border-radius: 12px;
+        backdrop-filter: blur(8px);
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      "
+    >
+      <div
+        style="
+          font-size: 0.6rem;
+          font-weight: 800;
+          color: #2dd4bf;
+          text-transform: uppercase;
+          letter-spacing: 1px;
+          text-align: center;
+        "
+      >
+        Energy Cost Mode
+      </div>
+      <div style="display: flex; gap: 6px">
+        <button
+          id="btn-mode-ni"
+          onclick="setEnergyMode('ni')"
+          style="
+            background: rgba(16, 185, 129, 0.2);
+            color: #10b981;
+            border: 1px solid #10b981;
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+          "
+        >
+          🌿 NI Stack
+        </button>
+        <button
+          id="btn-mode-llm"
+          onclick="setEnergyMode('llm')"
+          style="
+            background: rgba(255, 255, 255, 0.05);
+            color: #94a3b8;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            padding: 6px 10px;
+            border-radius: 6px;
+            font-size: 0.65rem;
+            font-weight: 700;
+            cursor: pointer;
+            transition: all 0.2s;
+          "
+        >
+          ☢️ LLM-as-a-Judge
+        </button>
+      </div>
+    </div>
     <div id="info-panel">
       <div class="domain"></div>
       <h3></h3>
@@ -437,6 +503,28 @@
     <script src="js/flythrough-layers.js?v=39"></script>
     <script>
       "use strict";
+
+      var energyMode = "ni";
+      function setEnergyMode(mode) {
+        energyMode = mode;
+        document.getElementById("btn-mode-ni").style.background =
+          mode === "ni" ? "rgba(16,185,129,0.2)" : "rgba(255,255,255,0.05)";
+        document.getElementById("btn-mode-ni").style.borderColor =
+          mode === "ni" ? "#10b981" : "rgba(255,255,255,0.1)";
+        document.getElementById("btn-mode-ni").style.color =
+          mode === "ni" ? "#10b981" : "#94a3b8";
+
+        document.getElementById("btn-mode-llm").style.background =
+          mode === "llm" ? "rgba(239,68,68,0.2)" : "rgba(255,255,255,0.05)";
+        document.getElementById("btn-mode-llm").style.borderColor =
+          mode === "llm" ? "#ef4444" : "rgba(255,255,255,0.1)";
+        document.getElementById("btn-mode-llm").style.color =
+          mode === "llm" ? "#ef4444" : "#94a3b8";
+      }
+
+      var totalBlockedEver = 0;
+      var bottomPlanted = []; // { x, type, stage }
+
       var PHI = 1.618033988749;
       var canvas = document.getElementById("scene");
       var ctx = canvas.getContext("2d");
@@ -1701,6 +1789,29 @@
             (mousePhaseZone && mousePhaseZone === promptPhase) || isSelected;
           var effSpeed = inSlowZone ? fp.speed * 0.06 : fp.speed;
           if (fp._blocked) {
+            // Energy/Tree Logic
+            if (!fp._countedBlock) {
+              fp._countedBlock = true;
+              totalBlockedEver++;
+              var stage = totalBlockedEver % 10;
+              if (stage === 0) stage = 10;
+
+              var plantType = energyMode === "ni" ? "tree" : "reactor";
+              if (
+                bottomPlanted.length === 0 ||
+                bottomPlanted[bottomPlanted.length - 1].stage >= 10 ||
+                bottomPlanted[bottomPlanted.length - 1].type !== plantType
+              ) {
+                bottomPlanted.push({
+                  x: 50 + bottomPlanted.length * 35,
+                  type: plantType,
+                  stage: 1,
+                });
+              } else {
+                bottomPlanted[bottomPlanted.length - 1].stage = stage;
+              }
+            }
+
             fp._blockTimer++;
             if (fp._blockTimer > 150) {
               // Blocked prompt fades out, then respawns at entry
@@ -1708,6 +1819,7 @@
               fp.y = (Math.random() - 0.5) * H * 0.35;
               fp._blocked = false;
               fp._blockTimer = 0;
+              fp._countedBlock = false;
             }
           } else {
             fp.x += effSpeed;
@@ -1731,11 +1843,6 @@
                 fp.x = -W / 2 - 30;
                 fp.y = (Math.random() - 0.5) * H * 0.3;
               } else {
-                // ═══ TRUST TREE: Prompt passed all phases! ═══
-                // Drop down and grow a tree as visual metaphor
-                var treeX = cx + fp.x * currentZoom + px * 0.3 + currentPanX;
-                var treeY = cy + fp.y * currentZoom + py * 0.3;
-                spawnTree(treeX, treeY);
                 // Normal completion: prompt exits and respawns
                 fp.x = -W / 2 - 50;
                 fp.y = (Math.random() - 0.5) * H * 0.35;
@@ -2041,7 +2148,85 @@
         drawHeartbeat(t);
         // Supernova particles (LLM hit effect)
         drawSupernovaParticles(ctx);
+        // Energy/Tree Visualizer at bottom
+        drawBottomPlanted(ctx);
         requestAnimationFrame(render);
+      }
+
+      function drawBottomPlanted(ctx) {
+        if (bottomPlanted.length === 0) return;
+        ctx.globalAlpha = 0.9;
+
+        // Dynamic bottom bar with glow based on mode
+        var modeColor =
+          energyMode === "ni"
+            ? "rgba(16,185,129,0.15)"
+            : "rgba(239,68,68,0.15)";
+        var modeStroke =
+          energyMode === "ni" ? "rgba(16,185,129,0.3)" : "rgba(239,68,68,0.3)";
+        ctx.fillStyle = "rgba(10, 15, 30, 0.75)";
+        ctx.fillRect(0, H - 70, W, 70);
+        ctx.fillStyle = modeColor;
+        ctx.fillRect(0, H - 70, W, 70);
+
+        ctx.strokeStyle = modeStroke;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(0, H - 70);
+        ctx.lineTo(W, H - 70);
+        ctx.stroke();
+
+        for (var i = 0; i < bottomPlanted.length; i++) {
+          var p = bottomPlanted[i];
+          var px = p.x % (W - 100);
+          var py = H - 35 - Math.floor(p.x / (W - 100)) * 50;
+
+          ctx.font = "28px Arial";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+
+          if (p.type === "tree") {
+            if (p.stage < 4) ctx.fillText("🌱", px, py - 5);
+            else if (p.stage < 8) ctx.fillText("🌿", px, py - 5);
+            else {
+              ctx.fillText("🌳", px, py - 5);
+              ctx.shadowColor = "rgba(34,197,94,0.5)";
+              ctx.shadowBlur = 10;
+              ctx.fillText("🌳", px, py - 5);
+              ctx.shadowBlur = 0;
+            }
+
+            if (p.stage < 10) {
+              ctx.font = "9px Inter";
+              ctx.fillStyle = "#10b981";
+              ctx.fillText(p.stage + "/10", px, py + 18);
+            } else {
+              ctx.font = "10px Inter";
+              ctx.fillStyle = "#10b981";
+              ctx.fillText("-200kWh", px, py + 18);
+            }
+          } else {
+            if (p.stage < 5) ctx.fillText("🏗️", px, py - 5);
+            else {
+              ctx.fillText("☢️", px, py - 5);
+              ctx.shadowColor = "rgba(239,68,68,0.5)";
+              ctx.shadowBlur = 15;
+              ctx.fillText("☢️", px, py - 5);
+              ctx.shadowBlur = 0;
+            }
+
+            if (p.stage < 10) {
+              ctx.font = "9px Inter";
+              ctx.fillStyle = "#ef4444";
+              ctx.fillText(p.stage + "/10", px, py + 18);
+            } else {
+              ctx.font = "10px Inter";
+              ctx.fillStyle = "#ef4444";
+              ctx.fillText("+5kW GPU", px, py + 18);
+            }
+          }
+        }
+        ctx.globalAlpha = 1;
       }
 
       // LIVE prompt lifecycle tracker — COMPLETE journey with POAW + NI-Shield
