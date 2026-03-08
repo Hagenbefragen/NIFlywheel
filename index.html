@@ -1221,6 +1221,22 @@
         });
       }
 
+      var prisms = [];
+      var dnaStrands = [];
+      var magneticFields = [];
+
+      function spawnPrism(x, y) {
+        prisms.push({ x: x, y: y, life: 1.0, scale: 0 });
+      }
+
+      function spawnDNA(x, y) {
+        dnaStrands.push({ x: x, y: y, life: 1.0, phase: 0 });
+      }
+
+      function spawnMagneticField(x, y) {
+        magneticFields.push({ x: x, y: y, life: 1.0, radius: 20 });
+      }
+
       function drawScientificAnimations(ctx) {
         // 1. Mycelium Pulses
         for (var i = myceliumPulses.length - 1; i >= 0; i--) {
@@ -1471,6 +1487,105 @@
             ctx.lineWidth = 2;
             ctx.beginPath();
             ctx.arc(bf.x, bf.y, r, 0, Math.PI * 2);
+            ctx.stroke();
+          }
+        }
+
+        // 10. Optical Prism (Spectroscopy)
+        for (var i = prisms.length - 1; i >= 0; i--) {
+          var pr = prisms[i];
+          pr.life -= 0.015;
+          pr.scale += (1 - pr.scale) * 0.1;
+          if (pr.life <= 0) {
+            prisms.splice(i, 1);
+            continue;
+          }
+          ctx.globalAlpha = pr.life;
+          var s = 30 * pr.scale;
+          // Prism Glass Triangle
+          ctx.fillStyle = "rgba(255, 255, 255, 0.2)";
+          ctx.strokeStyle = "rgba(255, 255, 255, 0.8)";
+          ctx.lineWidth = 1.5;
+          ctx.beginPath();
+          ctx.moveTo(pr.x, pr.y - s);
+          ctx.lineTo(pr.x + s * 0.8, pr.y + s * 0.8);
+          ctx.lineTo(pr.x - s * 0.8, pr.y + s * 0.8);
+          ctx.closePath();
+          ctx.fill();
+          ctx.stroke();
+
+          // White light entering
+          ctx.strokeStyle = "white";
+          ctx.beginPath();
+          ctx.moveTo(pr.x - s * 2, pr.y);
+          ctx.lineTo(pr.x - s * 0.4, pr.y);
+          ctx.stroke();
+
+          // Rainbow exiting
+          var colors = ["red", "orange", "yellow", "green", "blue", "violet"];
+          for (var c = 0; c < colors.length; c++) {
+            ctx.strokeStyle = colors[c];
+            ctx.beginPath();
+            ctx.moveTo(pr.x + s * 0.4, pr.y);
+            ctx.lineTo(pr.x + s * 2, pr.y - s + c * ((s * 2) / 5));
+            ctx.stroke();
+          }
+        }
+
+        // 11. DNA Helix
+        for (var i = dnaStrands.length - 1; i >= 0; i--) {
+          var dna = dnaStrands[i];
+          dna.life -= 0.01;
+          dna.phase += 0.2;
+          if (dna.life <= 0) {
+            dnaStrands.splice(i, 1);
+            continue;
+          }
+          ctx.globalAlpha = dna.life * 0.8;
+          ctx.lineWidth = 2;
+          for (var j = -20; j <= 20; j += 4) {
+            var y1 = dna.y + Math.sin(dna.phase + j * 0.2) * 15;
+            var y2 = dna.y + Math.sin(dna.phase + j * 0.2 + Math.PI) * 15;
+            ctx.strokeStyle = "rgba(45, 212, 191, 0.4)";
+            ctx.beginPath();
+            ctx.moveTo(dna.x + j, y1);
+            ctx.lineTo(dna.x + j, y2);
+            ctx.stroke();
+            ctx.fillStyle = "#34d399";
+            ctx.beginPath();
+            ctx.arc(dna.x + j, y1, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+            ctx.fillStyle = "#60a5fa";
+            ctx.beginPath();
+            ctx.arc(dna.x + j, y2, 1.5, 0, Math.PI * 2);
+            ctx.fill();
+          }
+        }
+
+        // 12. Magnetic Field (SIREN Repulsion)
+        for (var i = magneticFields.length - 1; i >= 0; i--) {
+          var mf = magneticFields[i];
+          mf.life -= 0.02;
+          mf.radius += 5;
+          if (mf.life <= 0) {
+            magneticFields.splice(i, 1);
+            continue;
+          }
+          ctx.globalAlpha = mf.life * 0.7;
+          ctx.strokeStyle = "#8b5cf6";
+          ctx.lineWidth = 1.5;
+          for (var m = 1; m <= 3; m++) {
+            ctx.beginPath();
+            ctx.ellipse(
+              mf.x - 20,
+              mf.y,
+              mf.radius * m * 0.3,
+              mf.radius * m,
+              0,
+              -Math.PI / 2,
+              Math.PI / 2,
+              true,
+            );
             ctx.stroke();
           }
         }
@@ -2259,6 +2374,11 @@
                   cx + fp.x * currentZoom + px * 0.3 + currentPanX,
                   cy + fp.y * currentZoom + py * 0.3,
                 );
+                // 12. Magnetic Repulsion
+                spawnMagneticField(
+                  cx + fp.x * currentZoom + px * 0.3 + currentPanX,
+                  cy + fp.y * currentZoom + py * 0.3,
+                );
 
                 fp.x = -W / 2 - 30;
                 fp.y = (Math.random() - 0.5) * H * 0.3;
@@ -2291,6 +2411,11 @@
             );
             // 7. Quantum Entanglement
             spawnQuantumEntanglement(
+              cx + fp.x * currentZoom + px * 0.3 + currentPanX,
+              cy + fp.y * currentZoom + py * 0.3,
+            );
+            // 11. DNA Helix
+            spawnDNA(
               cx + fp.x * currentZoom + px * 0.3 + currentPanX,
               cy + fp.y * currentZoom + py * 0.3,
             );
@@ -2331,6 +2456,22 @@
                 // 1. Golden Spiral (if 2+ agents flag, Thermoballing)
                 if (fp._flaggedAgents.length >= 2) {
                   spawnGoldenSpiral(bsx, bsy);
+                }
+
+                // 10. Optical Prism (Spectroscopy from structural nodes)
+                var triggersPrism = fp._flaggedAgents.some(function (agentId) {
+                  var mappedId = LAYER_TO_AGENT
+                    ? LAYER_TO_AGENT[agentId] || agentId
+                    : agentId;
+                  return (
+                    mappedId === "pds" ||
+                    mappedId === "ics" ||
+                    mappedId === "composite" ||
+                    mappedId === "fsa"
+                  );
+                });
+                if (triggersPrism) {
+                  spawnPrism(bsx, bsy);
                 }
 
                 // 9. Butterfly Effect (Chaos Cascade from behavioral nodes)
@@ -2375,54 +2516,6 @@
           if (!fp._blocked && fp.x > -W / 2 && fp.x < W / 2) {
             if (fp._realLayers && fp._realLayers.length > 0) {
               // ═══ REAL CASCADE: Light up actual agents from AEGIS results ═══
-              // Map layer names to flythrough agent IDs
-              var LAYER_TO_AGENT = {
-                "cri-kleinhirn": "cri",
-                "pmb-memory-bank": "pmb",
-                "pds-frame-stripper": "pds",
-                "ics-v8": "ics",
-                keyword: "fsa",
-                imperative: "fsa",
-                "D1-HID": "hid",
-                "D4-Credential": "cred",
-                "D5-FictionHarm": "fh",
-                "D6-MetaLearn": "meta",
-                "D7-Urgency": "urgency",
-                "D8-SocialProof": "social",
-                "D9-EscBridge": "bridge",
-                "D10-EchoSeg": "echo",
-                "D11-PersonaShield": "persona",
-                "D12-UBN": "ubn",
-                "D13-SET": "set_layer",
-                "D14-CPD": "cpd",
-                "D15-FWG": "fwg",
-                "D16-LPD": "lpd",
-                "D17-LAPS": "laps",
-                "D18-ANTICIPATORY": "anticipatory",
-                "D19-GMA": "gma",
-                "D20-SOD": "dead_structural",
-                "D21-TTA": "tta",
-                "D22-KAID": "kaid",
-                "D23-HCG": "hcg",
-                "D24-HSD": "hsd",
-                "D25-HOLOGRAPHIC": "holographic",
-                "D26-STORM": "dead_storm",
-                "D27-TURB": "dead_turb",
-                "D30-CODE_EXEC": "code_exec",
-                "D31-META_INJECT": "meta_inject",
-                "D30b-UVID": "uvid",
-                "D33-EGC": "egc",
-                "D34-KIE": "kie",
-                "D35-LYAP": "lyap",
-                "D37-TDD": "tdd",
-                "D38-ETI": "eti",
-                "D39-KED": "ked",
-                "D3A-BDC": "bdc",
-                "D41-ANCHOR": "twain_anchor",
-                "D42-PAYLOAD": "twain_payload",
-                "D43-FRACTURE": "twain_fracture",
-                "D50-COMPOSITE": "composite",
-              };
               // Progress through cascade based on x position
               var cascadeProgress = Math.min(1, (fp.x + W * 0.3) / (W * 0.5));
               var layersToShow = Math.floor(
