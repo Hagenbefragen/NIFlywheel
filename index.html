@@ -926,6 +926,40 @@
           });
         }
       }
+
+      // ═══ TREE GROWTH (Verified Prompt → Trust Tree) ═══
+      var treeParticles = [];
+      function spawnTree(x, y) {
+        // Trunk: particles fall downward
+        for (var i = 0; i < 8; i++) {
+          treeParticles.push({
+            x: x + (Math.random() - 0.5) * 4,
+            y: y,
+            vx: (Math.random() - 0.5) * 0.3,
+            vy: 0.8 + Math.random() * 0.5,
+            life: 1.0,
+            size: 1.5 + Math.random() * 1.5,
+            type: "trunk",
+            hue: 140 + Math.random() * 30,
+          });
+        }
+        // Leaves: burst outward from trunk tip after delay
+        for (var j = 0; j < 14; j++) {
+          var la = (Math.PI * 2 * j) / 14 + (Math.random() - 0.5) * 0.4;
+          treeParticles.push({
+            x: x + (Math.random() - 0.5) * 6,
+            y: y + 30 + Math.random() * 20,
+            vx: Math.cos(la) * (0.4 + Math.random() * 0.8),
+            vy: Math.sin(la) * (0.3 + Math.random() * 0.5) + 0.15,
+            life: 1.0,
+            size: 2 + Math.random() * 3,
+            type: "leaf",
+            hue: 100 + Math.random() * 60,
+            delay: 15 + Math.random() * 20,
+          });
+        }
+      }
+
       function drawSupernovaParticles(ctx) {
         for (var i = supernovaParticles.length - 1; i >= 0; i--) {
           var p = supernovaParticles[i];
@@ -943,12 +977,51 @@
           ctx.beginPath();
           ctx.arc(p.x, p.y, p.size * p.life, 0, Math.PI * 2);
           ctx.fill();
-          // glow ring
           ctx.strokeStyle = "hsl(" + p.hue + ",100%,85%)";
           ctx.lineWidth = 0.5;
           ctx.beginPath();
           ctx.arc(p.x, p.y, p.size * p.life * 2, 0, Math.PI * 2);
           ctx.stroke();
+        }
+        // Tree particles
+        for (var ti = treeParticles.length - 1; ti >= 0; ti--) {
+          var tp = treeParticles[ti];
+          if (tp.delay && tp.delay > 0) {
+            tp.delay--;
+            continue;
+          }
+          tp.x += tp.vx;
+          tp.y += tp.vy;
+          tp.life -= tp.type === "trunk" ? 0.015 : 0.01;
+          tp.vx *= 0.96;
+          tp.vy *= tp.type === "trunk" ? 0.98 : 0.95;
+          if (tp.life <= 0) {
+            treeParticles.splice(ti, 1);
+            continue;
+          }
+          ctx.globalAlpha = tp.life * 0.85;
+          if (tp.type === "trunk") {
+            ctx.fillStyle = "hsl(30, 40%, 35%)";
+          } else {
+            ctx.fillStyle =
+              "hsl(" + tp.hue + ", 75%, " + (45 + tp.life * 25) + "%)";
+          }
+          ctx.beginPath();
+          ctx.arc(
+            tp.x,
+            tp.y,
+            tp.size * (tp.type === "leaf" ? Math.max(0.5, tp.life) : tp.life),
+            0,
+            Math.PI * 2,
+          );
+          ctx.fill();
+          if (tp.type === "leaf" && tp.life > 0.5) {
+            ctx.fillStyle = "hsl(" + tp.hue + ", 90%, 75%)";
+            ctx.font = tp.size * 1.5 + "px serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText("🌿", tp.x, tp.y);
+          }
         }
         ctx.globalAlpha = 1;
       }
@@ -1615,6 +1688,11 @@
                 fp.x = -W / 2 - 30;
                 fp.y = (Math.random() - 0.5) * H * 0.3;
               } else {
+                // ═══ TRUST TREE: Prompt passed all phases! ═══
+                // Drop down and grow a tree as visual metaphor
+                var treeX = cx + fp.x * currentZoom + px * 0.3 + currentPanX;
+                var treeY = cy + fp.y * currentZoom + py * 0.3;
+                spawnTree(treeX, treeY);
                 // Normal completion: prompt exits and respawns
                 fp.x = -W / 2 - 50;
                 fp.y = (Math.random() - 0.5) * H * 0.35;
@@ -1648,12 +1726,16 @@
             sy = cy + fp.y * currentZoom + py * 0.3;
           var phaseNum =
             promptPhase === "shield" ? 1 : promptPhase === "compress" ? 2 : 3;
+          // Prompt enters WHITE, transitions to phase color
+          var progress = Math.min(1, (fp.x + W / 2) / W); // 0→1 across screen
           var col = fp._blocked
             ? "rgba(239,68,68,0.9)"
             : fp._sirenReturn
             ? "rgba(168,85,247,0.85)"
             : isBlk
             ? "rgba(239,68,68,0.6)"
+            : progress < 0.15
+            ? "rgba(255,255,255," + (0.5 + progress * 2) + ")" // WHITE entry
             : phaseNum === 1
             ? "rgba(251,191,36,0.6)"
             : phaseNum === 2
